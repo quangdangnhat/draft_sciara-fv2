@@ -114,9 +114,13 @@ __global__ void computeOutflowsKernel(
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
 
-        // Boundary check
+        // Boundary check - eliminate neighbors outside domain
         if (ni < 0 || ni >= r || nj < 0 || nj >= c) {
             eliminated[k] = true;
+            z[k] = 0;
+            h[k] = 0;
+            w[k] = Pc;
+            Pr[k] = rr;
             continue;
         }
 
@@ -130,19 +134,15 @@ __global__ void computeOutflowsKernel(
             z[k] = sz;
         else
             z[k] = sz0 - (sz0 - sz) / sqrt(2.0);
+
+        eliminated[k] = false;  // Initialize as not eliminated
     }
 
     H[0] = z[0];
     theta[0] = 0;
     eliminated[0] = false;
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
-        int ni = i + d_Xi[k];
-        int nj = j + d_Xj[k];
-
-        if (ni < 0 || ni >= r || nj < 0 || nj >= c) {
-            eliminated[k] = true;
-            continue;
-        }
+        if (eliminated[k]) continue;  // Skip already eliminated neighbors
 
         if (z[0] + h[0] > z[k] + h[k]) {
             H[k] = z[k] + h[k];
