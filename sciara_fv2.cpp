@@ -77,8 +77,12 @@ void computeOutflows(
   int counter;
   double sz0, sz, T, avg, rr, hc;
 
-  if (GET(Sh, c, i, j) <= 0)
+  if (GET(Sh, c, i, j) <= 0) {
+    // Clear outflows for cells without lava
+    for (int k = 0; k < NUMBER_OF_OUTFLOWS; k++)
+      BUF_SET(Mf, r, c, k, i, j, 0.0);
     return;
+  }
 
   T = GET(ST, c, i, j);
   rr = pow(10, _a + _b * T);
