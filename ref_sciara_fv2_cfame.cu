@@ -479,29 +479,19 @@ void boundaryConditions_cuda(Sciara *sciara, dim3 grid, dim3 block)
 double reduceAdd_cuda(int r, int c, double *buffer)
 {
     int size = r * c;
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (size + threadsPerBlock * 2 - 1) / (threadsPerBlock * 2);
 
-    double* d_partial;
-    cudaMalloc(&d_partial, blocksPerGrid * sizeof(double));
-
-    // First reduction pass
-    reduceAddKernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(buffer, d_partial, size);
+    // Allocate host buffer and copy data from device/unified memory
+    double* h_buffer = (double*)malloc(size * sizeof(double));
     cudaDeviceSynchronize();
+    cudaMemcpy(h_buffer, buffer, size * sizeof(double), cudaMemcpyDeviceToHost);
 
-    // Continue reduction until we have a single value
-    while (blocksPerGrid > 1) {
-        int n = blocksPerGrid;
-        blocksPerGrid = (n + threadsPerBlock * 2 - 1) / (threadsPerBlock * 2);
-        reduceAddKernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(d_partial, d_partial, n);
-        cudaDeviceSynchronize();
+    // Perform reduction on CPU (more reliable with unified memory)
+    double result = 0.0;
+    for (int i = 0; i < size; i++) {
+        result += h_buffer[i];
     }
 
-    // Copy result from device to host
-    double result;
-    cudaMemcpy(&result, d_partial, sizeof(double), cudaMemcpyDeviceToHost);
-    cudaFree(d_partial);
-
+    free(h_buffer);
     return result;
 }
 
