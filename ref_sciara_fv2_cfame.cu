@@ -483,7 +483,7 @@ double reduceAdd_cuda(int r, int c, double *buffer)
     int blocksPerGrid = (size + threadsPerBlock * 2 - 1) / (threadsPerBlock * 2);
 
     double* d_partial;
-    cudaMallocManaged(&d_partial, blocksPerGrid * sizeof(double));
+    cudaMalloc(&d_partial, blocksPerGrid * sizeof(double));
 
     // First reduction pass
     reduceAddKernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(buffer, d_partial, size);
@@ -497,7 +497,9 @@ double reduceAdd_cuda(int r, int c, double *buffer)
         cudaDeviceSynchronize();
     }
 
-    double result = d_partial[0];
+    // Copy result from device to host
+    double result;
+    cudaMemcpy(&result, d_partial, sizeof(double), cudaMemcpyDeviceToHost);
     cudaFree(d_partial);
 
     return result;
