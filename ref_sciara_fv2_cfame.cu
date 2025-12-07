@@ -305,30 +305,31 @@ __global__ void boundaryConditions_kernel(
     }
 }
 
-__global__ void reduceAdd_kernel(int r, int c, double *buffer, double *result)
+// Parallel reduction kernel for sum (improved version)
+__global__ void reduceAddKernel(double* input, double* output, int n)
 {
-    __shared__ double sdata[256];
-    
-    int tid = threadIdx.x;
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    
-    sdata[tid] = 0.0;
-    
-    if (i < r * c) {
-        sdata[tid] = buffer[i];
-    }
+    extern __shared__ double sdata[];
+
+    unsigned int tid = threadIdx.x;
+    unsigned int i = blockIdx.x * blockDim.x * 2 + threadIdx.x;
+
+    // Load and add two elements per thread
+    double mySum = 0;
+    if (i < n) mySum = input[i];
+    if (i + blockDim.x < n) mySum += input[i + blockDim.x];
+    sdata[tid] = mySum;
     __syncthreads();
-    
-    for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+
+    // Reduction in shared memory
+    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
         if (tid < s) {
             sdata[tid] += sdata[tid + s];
         }
         __syncthreads();
     }
-    
-    if (tid == 0) {
-        atomicAddDouble(result, sdata[0]);
-    }
+
+    // Write result for this block
+    if (tid == 0) output[blockIdx.x] = sdata[0];
 }
 
 // ----------------------------------------------------------------------------
@@ -477,22 +478,29 @@ void boundaryConditions_cuda(Sciara *sciara, dim3 grid, dim3 block)
 
 double reduceAdd_cuda(int r, int c, double *buffer)
 {
-    double *d_result;
-    double h_result = 0.0;
-    
-    cudaMalloc(&d_result, sizeof(double));
-    cudaMemcpy(d_result, &h_result, sizeof(double), cudaMemcpyHostToDevice);
-    
-    int threads = 256;
-    int blocks = (r * c + threads - 1) / threads;
-    
-    reduceAdd_kernel<<<blocks, threads>>>(r, c, buffer, d_result);
+    int size = r * c;
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (size + threadsPerBlock * 2 - 1) / (threadsPerBlock * 2);
+
+    double* d_partial;
+    cudaMallocManaged(&d_partial, blocksPerGrid * sizeof(double));
+
+    // First reduction pass
+    reduceAddKernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(buffer, d_partial, size);
     cudaDeviceSynchronize();
-    
-    cudaMemcpy(&h_result, d_result, sizeof(double), cudaMemcpyDeviceToHost);
-    cudaFree(d_result);
-    
-    return h_result;
+
+    // Continue reduction until we have a single value
+    while (blocksPerGrid > 1) {
+        int n = blocksPerGrid;
+        blocksPerGrid = (n + threadsPerBlock * 2 - 1) / (threadsPerBlock * 2);
+        reduceAddKernel<<<blocksPerGrid, threadsPerBlock, threadsPerBlock * sizeof(double)>>>(d_partial, d_partial, n);
+        cudaDeviceSynchronize();
+    }
+
+    double result = d_partial[0];
+    cudaFree(d_partial);
+
+    return result;
 }
 
 // ----------------------------------------------------------------------------
