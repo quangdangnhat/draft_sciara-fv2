@@ -346,6 +346,8 @@ void emitLava_cuda(Sciara *sciara, dim3 grid, dim3 block)
             sciara->parameters->Pclock,
             sciara->simulation->emission_time,
             sciara->parameters->Pac);
+        // Track total emitted lava
+        sciara->simulation->total_emitted_lava += h_vent_thickness[k];
     }
     
     cudaMemcpy(d_vent_x, h_vent_x, sizeof(int) * num_vents, cudaMemcpyHostToDevice);
