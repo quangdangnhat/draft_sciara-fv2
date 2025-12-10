@@ -37,33 +37,31 @@ THICKNESS_THRESHOLD=1.0#resulting in 16000 steps
 EXEC_OMP = sciara_omp
 EXEC_SERIAL = sciara_serial
 EXEC_CUDA = sciara_cuda
-
-# CUDA architecture (adjust based on your GPU)
-# sm_52 for GTX 980, sm_61 for GTX 1080, sm_75 for RTX 2080, sm_86 for RTX 3080
-CUDA_ARCH = -arch=sm_50
-
-# Source files
-CPP_SOURCES = GISInfo.cpp cal2DBuffer.cpp cal2DBufferIO.cpp configurationPathLib.cpp io.cpp Sciara.cpp vent.cpp
-CUDA_SOURCES = sciara_fv2_cuda.cu
-
-# CUDA flags
-NVCC_FLAGS = -O3 $(CUDA_ARCH) -Xcompiler -O3
+EXEC_TILED = sciara_tiled
+EXEC_HALO = sciara_halo
+EXEC_CFAME = sciara_cfame
+EXEC_CFAMO = sciara_cfamo
 
 default:all
 
-all: serial omp
-
-serial:
+all:
 	$(CPPC) *.cpp -o $(EXEC_SERIAL) -O0
-
-omp:
 	$(CPPC) *.cpp -o $(EXEC_OMP) -fopenmp -O0
 
 cuda:
-	$(NVCC) $(NVCC_FLAGS) $(CPP_SOURCES) $(CUDA_SOURCES) -o $(EXEC_CUDA)
+	$(NVCC) sciara_cuda.cu sciara_fv2_cuda.cu io.cpp GISInfo.cpp vent.cpp configurationPathLib.cpp cal2DBuffer.cpp cal2DBufferIO.cpp -o $(EXEC_CUDA) -O3 -arch=sm_52
 
-cuda_debug:
-	$(NVCC) -g -G $(CUDA_ARCH) $(CPP_SOURCES) $(CUDA_SOURCES) -o $(EXEC_CUDA)
+tiled:
+	$(NVCC) sciara_cuda.cu sciara_fv2_tiled.cu io.cpp GISInfo.cpp vent.cpp configurationPathLib.cpp cal2DBuffer.cpp cal2DBufferIO.cpp -o $(EXEC_TILED) -O3 -arch=sm_52
+
+halo:
+	$(NVCC) sciara_cuda.cu sciara_fv2_halo.cu io.cpp GISInfo.cpp vent.cpp configurationPathLib.cpp cal2DBuffer.cpp cal2DBufferIO.cpp -o $(EXEC_HALO) -O3 -arch=sm_52
+
+cfame:
+	$(NVCC) sciara_cuda.cu sciara_fv2_cfame.cu io.cpp GISInfo.cpp vent.cpp configurationPathLib.cpp cal2DBuffer.cpp cal2DBufferIO.cpp -o $(EXEC_CFAME) -O3 -arch=sm_52
+
+cfamo:
+	$(NVCC) sciara_cuda.cu sciara_fv2_cfamo.cu io.cpp GISInfo.cpp vent.cpp configurationPathLib.cpp cal2DBuffer.cpp cal2DBufferIO.cpp -o $(EXEC_CFAMO) -O3 -arch=sm_52
 
 
 #############
@@ -80,16 +78,25 @@ run:
 run_cuda:
 	./$(EXEC_CUDA) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) && md5sum $(OUTPUT)
 
+run_tiled:
+	./$(EXEC_TILED) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) && md5sum $(OUTPUT)
+
+run_halo:
+	./$(EXEC_HALO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) && md5sum $(OUTPUT)
+
+run_cfame:
+	./$(EXEC_CFAME) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) && md5sum $(OUTPUT)
+
+run_cfamo:
+	./$(EXEC_CFAMO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) && md5sum $(OUTPUT)
+
 
 ############
 # CLEAN UP #
 ############
 
 clean:
-	rm -f $(EXEC_OMP) $(EXEC_SERIAL) $(EXEC_CUDA) *.o *output*
+	rm -f $(EXEC_OMP) $(EXEC_SERIAL) $(EXEC_CUDA) $(EXEC_TILED) $(EXEC_CFAME) $(EXEC_CFAMO) *.o *output*
 
 wipe:
 	rm -f *.o *output*
-
-clean_output:
-	rm -f ./data/2006/output_*

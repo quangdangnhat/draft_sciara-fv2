@@ -77,12 +77,8 @@ void computeOutflows(
   int counter;
   double sz0, sz, T, avg, rr, hc;
 
-  if (GET(Sh, c, i, j) <= 0) {
-    // Clear outflows for cells without lava
-    for (int k = 0; k < NUMBER_OF_OUTFLOWS; k++)
-      BUF_SET(Mf, r, c, k, i, j, 0.0);
+  if (GET(Sh, c, i, j) <= 0)
     return;
-  }
 
   T = GET(ST, c, i, j);
   rr = pow(10, _a + _b * T);
@@ -90,22 +86,9 @@ void computeOutflows(
 
   for (int k = 0; k < MOORE_NEIGHBORS; k++)
   {
-    int ni = i + Xi[k];
-    int nj = j + Xj[k];
-
-    // Boundary check - eliminate neighbors outside domain
-    if (ni < 0 || ni >= r || nj < 0 || nj >= c) {
-      eliminated[k] = true;
-      z[k] = 0;
-      h[k] = 0;
-      w[k] = Pc;
-      Pr[k] = rr;
-      continue;
-    }
-
     sz0 = GET(Sz, c, i, j);
-    sz = GET(Sz, c, ni, nj);
-    h[k] = GET(Sh, c, ni, nj);
+    sz = GET(Sz, c, i + Xi[k], j + Xj[k]);
+    h[k] = GET(Sh, c, i + Xi[k], j + Xj[k]);
     w[k] = Pc;
     Pr[k] = rr;
 
@@ -113,16 +96,12 @@ void computeOutflows(
       z[k] = sz;
     else
       z[k] = sz0 - (sz0 - sz) / sqrt(2.0);
-
-    eliminated[k] = false;
   }
 
   H[0] = z[0];
   theta[0] = 0;
   eliminated[0] = false;
-  for (int k = 1; k < MOORE_NEIGHBORS; k++) {
-    if (eliminated[k]) continue;
-
+  for (int k = 1; k < MOORE_NEIGHBORS; k++)
     if (z[0] + h[0] > z[k] + h[k])
     {
       H[k] = z[k] + h[k];
@@ -131,9 +110,10 @@ void computeOutflows(
     }
     else
     {
+      // H[k] = 0;
+      // theta[k] = 0;
       eliminated[k] = true;
     }
-  }
 
   do
   {
@@ -187,19 +167,8 @@ void massBalance(
 
   for (int n = 1; n < MOORE_NEIGHBORS; n++)
   {
-    int ni = i + Xi[n];
-    int nj = j + Xj[n];
-
-    // Boundary check
-    if (ni < 0 || ni >= r || nj < 0 || nj >= c) {
-      outFlow = BUF_GET(Mf, r, c, n - 1, i, j);
-      h_next -= outFlow;
-      t_next -= outFlow * initial_t;
-      continue;
-    }
-
-    neigh_t = GET(ST, c, ni, nj);
-    inFlow = BUF_GET(Mf, r, c, inflowsIndices[n - 1], ni, nj);
+    neigh_t = GET(ST, c, i + Xi[n], j + Xj[n]);
+    inFlow = BUF_GET(Mf, r, c, inflowsIndices[n - 1], i + Xi[n], j + Xj[n]);
 
     outFlow = BUF_GET(Mf, r, c, n - 1, i, j);
 

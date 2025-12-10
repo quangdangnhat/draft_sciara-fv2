@@ -1,27 +1,18 @@
 #include "Sciara.h"
 #include "cal2DBuffer.h"
-#include <cstring>
 
 void allocateSubstates(Sciara *sciara)
 {
-	int size = sciara->domain->rows * sciara->domain->cols;
-
-	sciara->substates->Sz       = new (std::nothrow) double[size];
-	sciara->substates->Sz_next  = new (std::nothrow) double[size];
-	sciara->substates->Sh       = new (std::nothrow) double[size];
-	sciara->substates->Sh_next  = new (std::nothrow) double[size];
-	sciara->substates->ST       = new (std::nothrow) double[size];
-	sciara->substates->ST_next  = new (std::nothrow) double[size];
-	sciara->substates->Mf       = new (std::nothrow) double[size * NUMBER_OF_OUTFLOWS];
-//sciara->substates->Mv       = new (std::nothrow)    int[size];
-	sciara->substates->Mb       = new (std::nothrow)   bool[size];
-	sciara->substates->Mhs      = new (std::nothrow) double[size];
-
-	// Initialize Mf to zero (prevents garbage values in first massBalance iteration)
-	memset(sciara->substates->Mf, 0, size * NUMBER_OF_OUTFLOWS * sizeof(double));
-
-	// Initialize Mb to false (makeBorder will set border cells to true)
-	memset(sciara->substates->Mb, 0, size * sizeof(bool));
+	sciara->substates->Sz       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+  sciara->substates->Sz_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+	sciara->substates->Sh       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+  sciara->substates->Sh_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+	sciara->substates->ST       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+  sciara->substates->ST_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+	sciara->substates->Mf       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols*NUMBER_OF_OUTFLOWS];
+//sciara->substates->Mv       = new (std::nothrow)    int[sciara->domain->rows*sciara->domain->cols];
+	sciara->substates->Mb       = new (std::nothrow)   bool[sciara->domain->rows*sciara->domain->cols];
+	sciara->substates->Mhs      = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
 }
 
 void deallocateSubstates(Sciara *sciara)
