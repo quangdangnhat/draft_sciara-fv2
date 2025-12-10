@@ -202,11 +202,14 @@ __global__ void boundaryConditions_kernel(
     double *Sh_next,
     double *ST_next)
 {
+    // NOTE: Disabled to match serial version (which has early return)
+    return;
+
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
-    
+
     if (i >= r || j >= c) return;
-    
+
     if (GET(Mb, c, i, j)) {
         SET(Sh_next, c, i, j, 0.0);
         SET(ST_next, c, i, j, 0.0);
