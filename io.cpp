@@ -264,7 +264,7 @@ int loadAlreadyAllocatedMap(char *path, int* S, int* nS, int lx, int ly) {
 
   calfLoadMatrix2Di(S, ly,lx, input_file);
   if (nS != NULL)
-    calCopyBuffer2Di(nS, S, ly, lx);
+    calCopyBuffer2Di(S, nS, ly, lx);
   fclose(input_file);
 
   return FILE_OK;
@@ -284,7 +284,7 @@ int loadAlreadyAllocatedMap(char *path, double* S, double* nS, int lx, int ly) {
 
   calfLoadMatrix2Dr(S, ly,lx, input_file);
   if (nS != NULL)
-    calCopyBuffer2Dr(nS, S, ly, lx);
+    calCopyBuffer2Dr(S, nS, ly, lx);
   fclose(input_file);
 
   return FILE_OK;
