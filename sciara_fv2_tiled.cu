@@ -465,9 +465,9 @@ int main(int argc, char **argv)
     int reduceInterval = atoi(argv[REDUCE_INTERVL_ID]);
     double thickness_threshold = atof(argv[THICKNESS_THRESHOLD_ID]);
 
-    while ((max_steps > 0 && sciara->simulation->step < max_steps) ||
-           (sciara->simulation->elapsed_time <= sciara->simulation->effusion_duration) ||
-           (total_current_lava == -1 || total_current_lava > thickness_threshold))
+    while ((max_steps > 0 && sciara->simulation->step < max_steps) &&
+           ((sciara->simulation->elapsed_time <= sciara->simulation->effusion_duration) ||
+            (total_current_lava == -1 || total_current_lava > thickness_threshold)))
     {
         sciara->simulation->elapsed_time += sciara->parameters->Pclock;
         sciara->simulation->step++;
