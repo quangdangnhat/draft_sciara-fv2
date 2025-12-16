@@ -198,12 +198,14 @@ __global__ void kernel_computeOutflows_tiled(
         }
     }
 
-    // Minimization algorithm
+    // Minimization algorithm - compute avg outside the loop to match serial version
+    double avg;
+    int counter;
     bool loop;
     do {
         loop = false;
-        double avg = h[0];
-        int counter = 0;
+        avg = h[0];
+        counter = 0;
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -219,19 +221,10 @@ __global__ void kernel_computeOutflows_tiled(
         }
     } while (loop);
 
-    // Compute outflows
+    // Compute outflows - use the final avg computed above
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
-            double avg = h[0];
-            int counter = 0;
-            for (int kk = 0; kk < MOORE_NEIGHBORS; kk++) {
-                if (!eliminated[kk]) {
-                    avg += H[kk];
-                    counter++;
-                }
-            }
-            if (counter != 0) avg = avg / (double)counter;
             flow = Pr[k] * (avg - H[k]);
         } else {
             flow = 0.0;
@@ -472,9 +465,9 @@ int main(int argc, char **argv)
     int reduceInterval = atoi(argv[REDUCE_INTERVL_ID]);
     double thickness_threshold = atof(argv[THICKNESS_THRESHOLD_ID]);
 
-    while ((max_steps > 0 && sciara->simulation->step < max_steps) &&
-           ((sciara->simulation->elapsed_time <= sciara->simulation->effusion_duration) ||
-            (total_current_lava == -1 || total_current_lava > thickness_threshold)))
+    while ((max_steps > 0 && sciara->simulation->step < max_steps) ||
+           (sciara->simulation->elapsed_time <= sciara->simulation->effusion_duration) ||
+           (total_current_lava == -1 || total_current_lava > thickness_threshold))
     {
         sciara->simulation->elapsed_time += sciara->parameters->Pclock;
         sciara->simulation->step++;
