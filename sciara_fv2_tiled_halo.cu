@@ -1,11 +1,13 @@
 /**
- * sciara_fv2_tiled_halo.cu - CUDA Tiled Version WITH Halo
+ * sciara_fv2_tiled_halo.cu - CUDA Tiled Version WITH Halo (OPTIMIZED)
  *
  * Uses shared memory with halo regions for complete neighbor access.
- * Each tile loads extra border cells (halo) to eliminate global memory
- * accesses for neighbor data.
  *
- * Tile layout: [HALO + TILE + HALO] in both dimensions
+ * OPTIMIZATIONS APPLIED:
+ * 1. Pointer swapping instead of cudaMemcpy
+ * 2. Direct vent update (no full-grid kernel for emitLava)
+ * 3. Reduced cudaDeviceSynchronize calls
+ * 4. Warp-level reduction with __shfl_down_sync
  */
 
 #include "Sciara.h"
@@ -13,6 +15,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <algorithm>
 
 // ----------------------------------------------------------------------------
 // I/O parameters
@@ -27,8 +30,8 @@
 // CUDA configuration - Tile sizes with halo
 // ----------------------------------------------------------------------------
 #define TILE_SIZE 16
-#define HALO_SIZE 1  // Moore neighborhood requires 1-cell halo
-#define BLOCK_SIZE (TILE_SIZE + 2 * HALO_SIZE)  // 18x18 for 16x16 tile
+#define HALO_SIZE 1
+#define BLOCK_SIZE (TILE_SIZE + 2 * HALO_SIZE)
 
 // CUDA error checking
 #define CUDA_CHECK(call) \
@@ -60,14 +63,10 @@ int h_Xj[] = {0,  0, -1,  1,  0, -1, -1,  1,  1};
 // Helper: Load tile with halo into shared memory
 // ----------------------------------------------------------------------------
 __device__ void loadTileWithHalo(
-    double* global, double shared[][BLOCK_SIZE],
+    double* __restrict__ global, double shared[][BLOCK_SIZE],
     int r, int c, int blockStartI, int blockStartJ,
     int tx, int ty, double defaultVal)
 {
-    // Each thread may need to load multiple elements to cover halo
-    // We use a 2D thread block of TILE_SIZE x TILE_SIZE
-    // Need to load BLOCK_SIZE x BLOCK_SIZE elements
-
     int elementsPerThread = (BLOCK_SIZE * BLOCK_SIZE + TILE_SIZE * TILE_SIZE - 1) / (TILE_SIZE * TILE_SIZE);
     int tid = ty * TILE_SIZE + tx;
 
@@ -90,7 +89,7 @@ __device__ void loadTileWithHalo(
 }
 
 __device__ void loadTileWithHaloBool(
-    bool* global, bool shared[][BLOCK_SIZE],
+    bool* __restrict__ global, bool shared[][BLOCK_SIZE],
     int r, int c, int blockStartI, int blockStartJ,
     int tx, int ty, bool defaultVal)
 {
@@ -116,37 +115,14 @@ __device__ void loadTileWithHaloBool(
 }
 
 // ----------------------------------------------------------------------------
-// CUDA Kernel: emitLava (Halo version)
-// ----------------------------------------------------------------------------
-__global__ void kernel_emitLava_halo(
-    int r, int c,
-    int* vent_x, int* vent_y, double* vent_thickness,
-    int num_vents,
-    double PTvent,
-    double* Sh, double* Sh_next,
-    double* ST_next)
-{
-    int j = blockIdx.x * TILE_SIZE + threadIdx.x;
-    int i = blockIdx.y * TILE_SIZE + threadIdx.y;
-
-    if (i >= r || j >= c) return;
-
-    for (int k = 0; k < num_vents; k++) {
-        if (i == vent_y[k] && j == vent_x[k]) {
-            double current_h = GET(Sh, c, i, j);
-            SET(Sh_next, c, i, j, current_h + vent_thickness[k]);
-            SET(ST_next, c, i, j, PTvent);
-        }
-    }
-}
-
-// ----------------------------------------------------------------------------
 // CUDA Kernel: computeOutflows WITH Halo
-// All neighbor accesses from shared memory
 // ----------------------------------------------------------------------------
 __global__ void kernel_computeOutflows_halo(
     int r, int c,
-    double* Sz, double* Sh, double* ST, double* Mf,
+    double* __restrict__ Sz,
+    double* __restrict__ Sh,
+    double* __restrict__ ST,
+    double* __restrict__ Mf,
     double Pc, double _a, double _b, double _c, double _d)
 {
     __shared__ double s_Sz[BLOCK_SIZE][BLOCK_SIZE];
@@ -159,7 +135,6 @@ __global__ void kernel_computeOutflows_halo(
     int blockStartI = blockIdx.y * TILE_SIZE;
     int blockStartJ = blockIdx.x * TILE_SIZE;
 
-    // Load tiles with halo
     loadTileWithHalo(Sz, s_Sz, r, c, blockStartI, blockStartJ, tx, ty, -9999.0);
     loadTileWithHalo(Sh, s_Sh, r, c, blockStartI, blockStartJ, tx, ty, 0.0);
     loadTileWithHalo(ST, s_ST, r, c, blockStartI, blockStartJ, tx, ty, 0.0);
@@ -170,7 +145,6 @@ __global__ void kernel_computeOutflows_halo(
 
     if (i >= r || j >= c) return;
 
-    // Shared memory indices (with halo offset)
     int si = ty + HALO_SIZE;
     int sj = tx + HALO_SIZE;
 
@@ -190,7 +164,6 @@ __global__ void kernel_computeOutflows_halo(
     double hc = pow(10.0, _c + _d * T);
     double sz0 = s_Sz[si][sj];
 
-    // Initialize neighbor data - all from shared memory
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -215,7 +188,6 @@ __global__ void kernel_computeOutflows_halo(
         eliminated[k] = false;
     }
 
-    // Initialize H and theta
     H[0] = z[0];
     theta[0] = 0;
     eliminated[0] = false;
@@ -230,7 +202,6 @@ __global__ void kernel_computeOutflows_halo(
         }
     }
 
-    // Minimization algorithm - compute avg outside the loop to match serial version
     double avg;
     int counter;
     bool loop;
@@ -253,7 +224,6 @@ __global__ void kernel_computeOutflows_halo(
         }
     } while (loop);
 
-    // Compute outflows - use the final avg computed above
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -270,9 +240,11 @@ __global__ void kernel_computeOutflows_halo(
 // ----------------------------------------------------------------------------
 __global__ void kernel_massBalance_halo(
     int r, int c,
-    double* Sh, double* Sh_next,
-    double* ST, double* ST_next,
-    double* Mf)
+    double* __restrict__ Sh,
+    double* __restrict__ Sh_next,
+    double* __restrict__ ST,
+    double* __restrict__ ST_next,
+    double* __restrict__ Mf)
 {
     __shared__ double s_Sh[BLOCK_SIZE][BLOCK_SIZE];
     __shared__ double s_ST[BLOCK_SIZE][BLOCK_SIZE];
@@ -333,10 +305,10 @@ __global__ void kernel_computeNewTemperatureAndSolidification_halo(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
-    double* Sz, double* Sz_next,
-    double* Sh, double* Sh_next,
-    double* ST, double* ST_next,
-    double* Mhs, bool* Mb)
+    double* __restrict__ Sz, double* __restrict__ Sz_next,
+    double* __restrict__ Sh, double* __restrict__ Sh_next,
+    double* __restrict__ ST, double* __restrict__ ST_next,
+    double* __restrict__ Mhs, bool* __restrict__ Mb)
 {
     __shared__ double s_Sz[BLOCK_SIZE][BLOCK_SIZE];
     __shared__ double s_Sh[BLOCK_SIZE][BLOCK_SIZE];
@@ -382,28 +354,46 @@ __global__ void kernel_computeNewTemperatureAndSolidification_halo(
     }
 }
 
+// ----------------------------------------------------------------------------
+// Optimized Reduction with warp shuffle
+// ----------------------------------------------------------------------------
+__inline__ __device__ double warpReduceSum(double val) {
+    for (int offset = warpSize / 2; offset > 0; offset /= 2) {
+        val += __shfl_down_sync(0xffffffff, val, offset);
+    }
+    return val;
+}
 
-// ----------------------------------------------------------------------------
-// Reduction kernel
-// ----------------------------------------------------------------------------
 __global__ void kernel_reduceAdd(double* input, double* output, int size)
 {
     extern __shared__ double sdata[];
+
     unsigned int tid = threadIdx.x;
     unsigned int i = blockIdx.x * blockDim.x * 2 + threadIdx.x;
 
     double sum = 0.0;
     if (i < size) sum += input[i];
     if (i + blockDim.x < size) sum += input[i + blockDim.x];
-    sdata[tid] = sum;
+
+    sum = warpReduceSum(sum);
+
+    int lane = tid % warpSize;
+    int warpId = tid / warpSize;
+
+    if (lane == 0) sdata[warpId] = sum;
     __syncthreads();
 
-    for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) {
-        if (tid < s) sdata[tid] += sdata[tid + s];
-        __syncthreads();
+    int numWarps = (blockDim.x + warpSize - 1) / warpSize;
+    if (tid < numWarps) {
+        sum = sdata[tid];
+    } else {
+        sum = 0.0;
     }
 
-    if (tid == 0) output[blockIdx.x] = sdata[0];
+    if (warpId == 0) {
+        sum = warpReduceSum(sum);
+        if (tid == 0) output[blockIdx.x] = sum;
+    }
 }
 
 double reduceAddCUDA(double* d_buffer, int size)
@@ -414,12 +404,13 @@ double reduceAddCUDA(double* d_buffer, int size)
     double* d_partial;
     CUDA_CHECK(cudaMallocManaged(&d_partial, numBlocks * sizeof(double)));
 
-    kernel_reduceAdd<<<numBlocks, blockSize, blockSize * sizeof(double)>>>(d_buffer, d_partial, size);
+    int sharedSize = (blockSize / 32 + 1) * sizeof(double);
+    kernel_reduceAdd<<<numBlocks, blockSize, sharedSize>>>(d_buffer, d_partial, size);
     CUDA_CHECK(cudaDeviceSynchronize());
 
     while (numBlocks > 1) {
         int newNumBlocks = (numBlocks + blockSize * 2 - 1) / (blockSize * 2);
-        kernel_reduceAdd<<<newNumBlocks, blockSize, blockSize * sizeof(double)>>>(d_partial, d_partial, numBlocks);
+        kernel_reduceAdd<<<newNumBlocks, blockSize, sharedSize>>>(d_partial, d_partial, numBlocks);
         CUDA_CHECK(cudaDeviceSynchronize());
         numBlocks = newNumBlocks;
     }
@@ -449,21 +440,15 @@ int main(int argc, char **argv)
     double total_current_lava = -1;
     simulationInitialize(sciara);
 
+    // Prepare vent data - store indices for direct access
     int num_vents = sciara->simulation->vent.size();
-    int* d_vent_x;
-    int* d_vent_y;
-    double* d_vent_thickness;
-
-    CUDA_CHECK(cudaMallocManaged(&d_vent_x, num_vents * sizeof(int)));
-    CUDA_CHECK(cudaMallocManaged(&d_vent_y, num_vents * sizeof(int)));
-    CUDA_CHECK(cudaMallocManaged(&d_vent_thickness, num_vents * sizeof(double)));
-
+    int* vent_indices = new int[num_vents];
     for (int k = 0; k < num_vents; k++) {
-        d_vent_x[k] = sciara->simulation->vent[k].x();
-        d_vent_y[k] = sciara->simulation->vent[k].y();
+        int vx = sciara->simulation->vent[k].x();
+        int vy = sciara->simulation->vent[k].y();
+        vent_indices[k] = vy * c + vx;
     }
 
-    // Block size is TILE_SIZE, not BLOCK_SIZE (which includes halo)
     dim3 blockDim(TILE_SIZE, TILE_SIZE);
     dim3 gridDim((c + TILE_SIZE - 1) / TILE_SIZE,
                  (r + TILE_SIZE - 1) / TILE_SIZE);
@@ -480,29 +465,22 @@ int main(int argc, char **argv)
         sciara->simulation->elapsed_time += sciara->parameters->Pclock;
         sciara->simulation->step++;
 
+        // OPTIMIZATION 2: Direct vent update via Unified Memory
         for (int k = 0; k < num_vents; k++) {
-            d_vent_thickness[k] = sciara->simulation->vent[k].thickness(
+            double thickness = sciara->simulation->vent[k].thickness(
                 sciara->simulation->elapsed_time,
                 sciara->parameters->Pclock,
                 sciara->simulation->emission_time,
                 sciara->parameters->Pac);
-            sciara->simulation->total_emitted_lava += d_vent_thickness[k];
+
+            sciara->simulation->total_emitted_lava += thickness;
+
+            int idx = vent_indices[k];
+            sciara->substates->Sh[idx] += thickness;
+            sciara->substates->ST[idx] = sciara->parameters->PTvent;
         }
 
-        // 1. Emit Lava
-        kernel_emitLava_halo<<<gridDim, blockDim>>>(
-            r, c, d_vent_x, d_vent_y, d_vent_thickness, num_vents,
-            sciara->parameters->PTvent,
-            sciara->substates->Sh, sciara->substates->Sh_next,
-            sciara->substates->ST_next);
-        CUDA_CHECK(cudaDeviceSynchronize());
-
-        CUDA_CHECK(cudaMemcpy(sciara->substates->Sh, sciara->substates->Sh_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(sciara->substates->ST, sciara->substates->ST_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-
-        // 2. Compute Outflows
+        // 1. Compute Outflows
         kernel_computeOutflows_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->substates->Sz, sciara->substates->Sh,
@@ -510,9 +488,8 @@ int main(int argc, char **argv)
             sciara->parameters->Pc,
             sciara->parameters->a, sciara->parameters->b,
             sciara->parameters->c, sciara->parameters->d);
-        CUDA_CHECK(cudaDeviceSynchronize());
 
-        // 3. Mass Balance
+        // 2. Mass Balance
         kernel_massBalance_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->substates->Sh, sciara->substates->Sh_next,
@@ -520,12 +497,11 @@ int main(int argc, char **argv)
             sciara->substates->Mf);
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        CUDA_CHECK(cudaMemcpy(sciara->substates->Sh, sciara->substates->Sh_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(sciara->substates->ST, sciara->substates->ST_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
+        // OPTIMIZATION 1: Pointer swap
+        std::swap(sciara->substates->Sh, sciara->substates->Sh_next);
+        std::swap(sciara->substates->ST, sciara->substates->ST_next);
 
-        // 4. Temperature and Solidification
+        // 3. Temperature and Solidification
         kernel_computeNewTemperatureAndSolidification_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->parameters->Pepsilon, sciara->parameters->Psigma,
@@ -538,14 +514,12 @@ int main(int argc, char **argv)
             sciara->substates->Mhs, sciara->substates->Mb);
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        CUDA_CHECK(cudaMemcpy(sciara->substates->Sz, sciara->substates->Sz_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(sciara->substates->Sh, sciara->substates->Sh_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(sciara->substates->ST, sciara->substates->ST_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
+        // OPTIMIZATION 1: Pointer swap
+        std::swap(sciara->substates->Sz, sciara->substates->Sz_next);
+        std::swap(sciara->substates->Sh, sciara->substates->Sh_next);
+        std::swap(sciara->substates->ST, sciara->substates->ST_next);
 
-        // 5. Reduction
+        // 4. Reduction
         if (sciara->simulation->step % reduceInterval == 0) {
             total_current_lava = reduceAddCUDA(sciara->substates->Sh, r * c);
         }
@@ -560,9 +534,7 @@ int main(int argc, char **argv)
     printf("Saving output to %s...\n", argv[OUTPUT_PATH_ID]);
     saveConfiguration(argv[OUTPUT_PATH_ID], sciara);
 
-    CUDA_CHECK(cudaFree(d_vent_x));
-    CUDA_CHECK(cudaFree(d_vent_y));
-    CUDA_CHECK(cudaFree(d_vent_thickness));
+    delete[] vent_indices;
 
     printf("Releasing memory...\n");
     finalize(sciara);
