@@ -1,0 +1,17 @@
+==325881== NVPROF is profiling process 325881, command: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==325881== Profiling application: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==325881== Profiling result:
+"Type","Time(%)","Time","Calls","Avg","Min","Max","Name"
+,%,s,,us,us,us,
+"GPU activities",55.719686,2.158800,16000,134.925000,132.352000,139.200000,"kernel_massBalance_halo(int, int, double*, double*, double*, double*, double*)"
+"GPU activities",26.183577,1.014455,16000,63.403000,62.176000,68.224000,"kernel_computeOutflows_halo(int, int, double*, double*, double*, double*, double, double, double, double, double)"
+"GPU activities",18.082230,0.700577,16000,43.786000,42.944000,44.673000,"kernel_computeNewTemperatureAndSolidification_halo(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)"
+"GPU activities",0.010345,0.000401,32,12.525000,4.064000,21.441000,"kernel_reduceAdd(double*, double*, int)"
+"GPU activities",0.004087,0.000158,9,17.593000,4.288000,72.576000,"[CUDA memset]"
+"GPU activities",0.000075,0.000003,2,1.456000,1.312000,1.600000,"[CUDA memcpy HtoD]"
+
+==325881== Unified Memory profiling result:
+"Device","Count","Avg Size","Min Size","Max Size","Total Size","Total Time",""
+"NVIDIA GeForce GTX 980 (0)",32005,4.100586KB,4.000000KB,1.125000MB,128.171875MB,0.000000,"Host To Device"
+"NVIDIA GeForce GTX 980 (0)",96153,21.407227KB,4.000000KB,508.000000KB,1.963089GB,0.000001,"Device To Host"
+Total CPU Page faults: 32076

@@ -1,0 +1,25 @@
+GPU Device Query
+================
+Device: NVIDIA GeForce GTX 980
+Compute Capability: 5.2
+Multiprocessors: 16
+CUDA Cores (estimated): 2048
+Memory Clock Rate: 3505.00 MHz
+Memory Bus Width: 256-bit
+L2 Cache Size: 2.00 MB
+Shared Memory Per Block: 48.00 KB
+
+Bandwidth Specifications:
+-------------------------
+Global read: 224.3 GB/s
+Shared read: 2119.7 GB/s
+Texture read: 28008.7 GB/s
+
+Compute Specifications:
+----------------------
+Peak FP32: 4981.0 GFLOP/s
+Peak FP64: 155.7 GFLOP/s (1/32 ratio)
+
+Note: These are theoretical peak values calculated from hardware specs.
+Actual achievable bandwidth may be 70-90% of these values.
+L1/L2 and Shared memory bandwidths are architecture-based estimates.

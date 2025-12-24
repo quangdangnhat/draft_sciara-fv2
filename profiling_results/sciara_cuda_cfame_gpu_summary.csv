@@ -1,0 +1,18 @@
+==325427== NVPROF is profiling process 325427, command: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==325427== Profiling application: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==325427== Profiling result:
+"Type","Time(%)","Time","Calls","Avg","Min","Max","Name"
+,%,ms,,us,us,us,
+"GPU activities",46.525709,878.383328,16000,54.898000,47.072000,133.281000,"kernel_CfA_Me(int, int, double*, double*, double*, double*, double*, double*, double, double, double, double, double)"
+"GPU activities",28.425130,536.652979,16000,33.540000,30.656000,41.088000,"kernel_initBuffers_CfAMe(int, int, double*, double*, double*, double*)"
+"GPU activities",12.750999,240.732818,16000,15.045000,13.760000,38.240000,"kernel_computeNewTemperatureAndSolidification(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)"
+"GPU activities",12.267965,231.613366,16000,14.475000,12.992000,24.896000,"kernel_normalizeTemperature(int, int, double*, double*)"
+"GPU activities",0.021618,0.408130,32,12.754000,4.032000,22.592000,"kernel_reduceAdd(double*, double*, int)"
+"GPU activities",0.008422,0.159008,9,17.667000,4.544000,72.576000,"[CUDA memset]"
+"GPU activities",0.000156,0.002944,2,1.472000,1.312000,1.632000,"[CUDA memcpy HtoD]"
+
+==325427== Unified Memory profiling result:
+"Device","Count","Avg Size","Min Size","Max Size","Total Size","Total Time",""
+"NVIDIA GeForce GTX 980 (0)",32005,4.100586KB,4.000000KB,1.125000MB,128.171875MB,0.000000,"Host To Device"
+"NVIDIA GeForce GTX 980 (0)",96153,21.407227KB,4.000000KB,508.000000KB,1.963089GB,0.000001,"Device To Host"
+Total CPU Page faults: 32076

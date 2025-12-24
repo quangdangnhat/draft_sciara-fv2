@@ -1,0 +1,9 @@
+==325415== NVPROF is profiling process 325415, command: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==325415== Profiling application: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==325415== Profiling result:
+==325415== Metric result:
+"Device","Kernel","Invocations","Metric Name","Metric Description","Min","Max","Avg"
+"NVIDIA GeForce GTX 980 (0)","kernel_computeOutflows(int, int, double*, double*, double*, double*, double, double, double, double, double)",10,"achieved_occupancy","Achieved Occupancy",0.258362,0.268414,0.263640
+"NVIDIA GeForce GTX 980 (0)","kernel_massBalance(int, int, double*, double*, double*, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.892039,0.904432,0.898365
+"NVIDIA GeForce GTX 980 (0)","kernel_reduceAdd(double*, double*, int)",2,"achieved_occupancy","Achieved Occupancy",0.103210,0.876251,0.489730
+"NVIDIA GeForce GTX 980 (0)","kernel_computeNewTemperatureAndSolidification(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)",10,"achieved_occupancy","Achieved Occupancy",0.744123,0.772862,0.757337

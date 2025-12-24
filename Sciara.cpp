@@ -3,30 +3,30 @@
 
 void allocateSubstates(Sciara *sciara)
 {
-	sciara->substates->Sz       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->Sz_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Sh       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->Sh_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->ST       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->ST_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mf       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols*NUMBER_OF_OUTFLOWS];
-//sciara->substates->Mv       = new (std::nothrow)    int[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mb       = new (std::nothrow)   bool[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mhs      = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+    int size = sciara->domain->rows * sciara->domain->cols;
+
+    sciara->substates->Sz = new double[size]();
+    sciara->substates->Sz_next = new double[size]();
+    sciara->substates->Sh = new double[size]();
+    sciara->substates->Sh_next = new double[size]();
+    sciara->substates->ST = new double[size]();
+    sciara->substates->ST_next = new double[size]();
+    sciara->substates->Mf = new double[size * NUMBER_OF_OUTFLOWS]();
+    sciara->substates->Mb = new bool[size]();
+    sciara->substates->Mhs = new double[size]();
 }
 
 void deallocateSubstates(Sciara *sciara)
 {
-	if(sciara->substates->Sz)       delete[] sciara->substates->Sz;
-  if(sciara->substates->Sz_next)  delete[] sciara->substates->Sz_next;
-	if(sciara->substates->Sh)       delete[] sciara->substates->Sh;
-  if(sciara->substates->Sh_next)  delete[] sciara->substates->Sh_next;
-	if(sciara->substates->ST)       delete[] sciara->substates->ST;
-  if(sciara->substates->ST_next)  delete[] sciara->substates->ST_next;
-	if(sciara->substates->Mf)       delete[] sciara->substates->Mf;
-//if(sciara->substates->Mv)       delete[] sciara->substates->Mv;
-	if(sciara->substates->Mb)       delete[] sciara->substates->Mb;
-	if(sciara->substates->Mhs)      delete[] sciara->substates->Mhs;
+    delete[] sciara->substates->Sz;
+    delete[] sciara->substates->Sz_next;
+    delete[] sciara->substates->Sh;
+    delete[] sciara->substates->Sh_next;
+    delete[] sciara->substates->ST;
+    delete[] sciara->substates->ST_next;
+    delete[] sciara->substates->Mf;
+    delete[] sciara->substates->Mb;
+    delete[] sciara->substates->Mhs;
 }
 
 void evaluatePowerLawParams(double PTvent, double PTsol, double value_sol, double value_vent, double &k1, double &k2)
@@ -57,11 +57,11 @@ void simulationInitialize(Sciara* sciara)
 
   // compute a, b (viscosity parameters) and c, d (shear-resistance parameters)
   evaluatePowerLawParams(
-      sciara->parameters->PTvent, 
-      sciara->parameters->PTsol, 
-      sciara->parameters->Pr_Tsol,  
-      sciara->parameters->Pr_Tvent,  
-      sciara->parameters->a, 
+      sciara->parameters->PTvent,
+      sciara->parameters->PTsol,
+      sciara->parameters->Pr_Tsol,
+      sciara->parameters->Pr_Tvent,
+      sciara->parameters->a,
       sciara->parameters->b);
   evaluatePowerLawParams(
       sciara->parameters->PTvent,
@@ -107,7 +107,7 @@ void finalize(Sciara*& sciara)
   sciara = NULL;
 }
 
-void makeBorder(Sciara *sciara) 
+void makeBorder(Sciara *sciara)
 {
 	int j, i;
 
@@ -128,13 +128,13 @@ void makeBorder(Sciara *sciara)
 	for (i = 0; i < sciara->domain->rows; i++)
 		if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i, j) >= 0)
 			calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
-  
+
   // last column
 	j = sciara->domain->cols - 1;
 	for (i = 0; i < sciara->domain->rows; i++)
 		if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i, j) >= 0)
 			calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
-	
+
   // the rest
 	for (int i = 1; i < sciara->domain->rows - 1; i++)
 		for (int j = 1; j < sciara->domain->cols - 1; j++)
@@ -142,7 +142,7 @@ void makeBorder(Sciara *sciara)
 				for (int k = 1; k < MOORE_NEIGHBORS; k++)
 					if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i+sciara->X->Xi[k], j+sciara->X->Xj[k]) < 0)
           {
-			      calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
+		      calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
 						break;
 					}
 			}

@@ -382,26 +382,6 @@ __global__ void kernel_computeNewTemperatureAndSolidification_halo(
     }
 }
 
-// ----------------------------------------------------------------------------
-// CUDA Kernel: boundaryConditions
-// ----------------------------------------------------------------------------
-__global__ void kernel_boundaryConditions_halo(
-    int r, int c,
-    bool* Mb,
-    double* Sh, double* Sh_next,
-    double* ST, double* ST_next)
-{
-    int j = blockIdx.x * TILE_SIZE + threadIdx.x;
-    int i = blockIdx.y * TILE_SIZE + threadIdx.y;
-
-    if (i >= r || j >= c) return;
-    return; // Disabled
-
-    if (GET(Mb, c, i, j)) {
-        SET(Sh_next, c, i, j, 0.0);
-        SET(ST_next, c, i, j, 0.0);
-    }
-}
 
 // ----------------------------------------------------------------------------
 // Reduction kernel
@@ -565,19 +545,7 @@ int main(int argc, char **argv)
         CUDA_CHECK(cudaMemcpy(sciara->substates->ST, sciara->substates->ST_next,
                    sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
 
-        // 5. Boundary Conditions
-        kernel_boundaryConditions_halo<<<gridDim, blockDim>>>(
-            r, c, sciara->substates->Mb,
-            sciara->substates->Sh, sciara->substates->Sh_next,
-            sciara->substates->ST, sciara->substates->ST_next);
-        CUDA_CHECK(cudaDeviceSynchronize());
-
-        CUDA_CHECK(cudaMemcpy(sciara->substates->Sh, sciara->substates->Sh_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-        CUDA_CHECK(cudaMemcpy(sciara->substates->ST, sciara->substates->ST_next,
-                   sizeof(double) * r * c, cudaMemcpyDeviceToDevice));
-
-        // 6. Reduction
+        // 5. Reduction
         if (sciara->simulation->step % reduceInterval == 0) {
             total_current_lava = reduceAddCUDA(sciara->substates->Sh, r * c);
         }

@@ -1,0 +1,10 @@
+==325717== NVPROF is profiling process 325717, command: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==325717== Profiling application: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==325717== Profiling result:
+==325717== Metric result:
+"Device","Kernel","Invocations","Metric Name","Metric Description","Min","Max","Avg"
+"NVIDIA GeForce GTX 980 (0)","kernel_CfA_Mo(int, int, double*, double*, double*, double*, double*, double, double, double, double, double)",10,"achieved_occupancy","Achieved Occupancy",0.182080,0.186479,0.184879
+"NVIDIA GeForce GTX 980 (0)","kernel_normalizeTemperature(int, int, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.775077,0.791279,0.782709
+"NVIDIA GeForce GTX 980 (0)","kernel_reduceAdd(double*, double*, int)",2,"achieved_occupancy","Achieved Occupancy",0.103290,0.871501,0.487395
+"NVIDIA GeForce GTX 980 (0)","kernel_computeNewTemperatureAndSolidification(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)",10,"achieved_occupancy","Achieved Occupancy",0.688020,0.709511,0.698568
+"NVIDIA GeForce GTX 980 (0)","kernel_initBuffers(int, int, double*, double*, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.775708,0.801749,0.788675

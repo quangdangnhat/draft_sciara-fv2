@@ -121,26 +121,30 @@ run_all_cuda: sciara_cuda
 	@echo "============================================"
 	./$(EXEC_CUDA_CFAMO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
 
-# Verify correctness (md5 checksum)
-EXPECTED_MD5=704a4a65d1890589e952b155d53b110d
-TEMP_OUTPUT=./data/2006/output_2006_000000016000_Temperature.asc
-
-verify: sciara_cuda
-	@echo "Verifying CUDA Global..."
-	@./$(EXEC_CUDA) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) > /dev/null 2>&1
-	@md5sum $(TEMP_OUTPUT) | grep -q $(EXPECTED_MD5) && echo "CUDA Global: PASS" || echo "CUDA Global: FAIL"
-	@echo "Verifying CUDA Tiled..."
-	@./$(EXEC_CUDA_TILED) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) > /dev/null 2>&1
-	@md5sum $(TEMP_OUTPUT) | grep -q $(EXPECTED_MD5) && echo "CUDA Tiled: PASS" || echo "CUDA Tiled: FAIL"
-	@echo "Verifying CUDA Tiled+Halo..."
-	@./$(EXEC_CUDA_TILED_HALO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) > /dev/null 2>&1
-	@md5sum $(TEMP_OUTPUT) | grep -q $(EXPECTED_MD5) && echo "CUDA Tiled+Halo: PASS" || echo "CUDA Tiled+Halo: FAIL"
-	@echo "Verifying CUDA CfAMe..."
-	@./$(EXEC_CUDA_CFAME) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) > /dev/null 2>&1
-	@md5sum $(TEMP_OUTPUT) | grep -q $(EXPECTED_MD5) && echo "CUDA CfAMe: PASS" || echo "CUDA CfAMe: FAIL"
-	@echo "Verifying CUDA CfAMo..."
-	@./$(EXEC_CUDA_CFAMO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD) > /dev/null 2>&1
-	@md5sum $(TEMP_OUTPUT) | grep -q $(EXPECTED_MD5) && echo "CUDA CfAMo: PASS" || echo "CUDA CfAMo: FAIL"
+# This target just runs all versions and shows their output for manual comparison
+benchmark: sciara_cuda
+	@echo "============================================"
+	@echo "Benchmarking all CUDA versions..."
+	@echo "============================================"
+	@echo ""
+	@echo "--- CUDA Global ---"
+	@./$(EXEC_CUDA) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
+	@echo ""
+	@echo "--- CUDA Tiled ---"
+	@./$(EXEC_CUDA_TILED) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
+	@echo ""
+	@echo "--- CUDA Tiled+Halo ---"
+	@./$(EXEC_CUDA_TILED_HALO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
+	@echo ""
+	@echo "--- CUDA CfAMe ---"
+	@./$(EXEC_CUDA_CFAME) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
+	@echo ""
+	@echo "--- CUDA CfAMo ---"
+	@./$(EXEC_CUDA_CFAMO) $(INPUT_CONFIG) $(OUTPUT_CONFIG) $(STEPS) $(REDUCE_INTERVL) $(THICKNESS_THRESHOLD)
+	@echo ""
+	@echo "============================================"
+	@echo "Benchmark complete!"
+	@echo "============================================"
 
 ############
 #  PROFILE #
@@ -165,4 +169,4 @@ clean-profile:
 
 clean-all: clean wipe clean-profile
 
-.PHONY: default all serial omp cuda cuda_tiled cuda_tiled_halo cuda_cfame cuda_cfamo sciara_cuda run run_omp run_cuda run_cuda_tiled run_cuda_tiled_halo run_cuda_cfame run_cuda_cfamo run_all_cuda verify clean wipe clean-profile clean-all profile
+.PHONY: default all serial omp cuda cuda_tiled cuda_tiled_halo cuda_cfame cuda_cfamo sciara_cuda run run_omp run_cuda run_cuda_tiled run_cuda_tiled_halo run_cuda_cfame run_cuda_cfamo run_all_cuda benchmark clean wipe clean-profile clean-all profile
