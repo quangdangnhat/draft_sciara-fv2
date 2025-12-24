@@ -536,6 +536,7 @@ int main(int argc, char **argv)
             sciara->substates->Sh, sciara->substates->ST,
             d_vent_indices, d_emission_thicknesses,
             sciara->parameters->PTvent, num_vents);
+        CUDA_CHECK(cudaDeviceSynchronize());  // Ensure emitLava completes before outflows
 
         // =========================================================
         // Kernel 2: computeOutflows - Calculate lava outflows
