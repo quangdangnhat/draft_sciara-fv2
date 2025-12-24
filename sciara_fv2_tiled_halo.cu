@@ -519,6 +519,8 @@ int main(int argc, char **argv)
         // =========================================================
         // Kernel 1: emitLava - Lava emission from vents
         // =========================================================
+        // Sync before CPU writes to d_emission_thicknesses (UVM requires this)
+        CUDA_CHECK(cudaDeviceSynchronize());
         for (int k = 0; k < num_vents; k++) {
             double thickness = sciara->simulation->vent[k].thickness(
                 sciara->simulation->elapsed_time,

@@ -409,6 +409,8 @@ int main(int argc, char **argv)
         sciara->simulation->step++;
 
         // Calculate vent thickness for this step
+        // Sync before CPU writes to d_vent_thickness (UVM requires this)
+        CUDA_CHECK(cudaDeviceSynchronize());
         for (int k = 0; k < num_vents; k++) {
             d_vent_thickness[k] = sciara->simulation->vent[k].thickness(
                 sciara->simulation->elapsed_time,
