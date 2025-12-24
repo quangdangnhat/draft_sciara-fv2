@@ -1,32 +1,57 @@
 #include "Sciara.h"
 #include "cal2DBuffer.h"
+#include <cuda_runtime.h>
+
+// CUDA error checking macro
+#define CUDA_CHECK(call) \
+    do { \
+        cudaError_t err = call; \
+        if (err != cudaSuccess) { \
+            fprintf(stderr, "CUDA error at %s:%d: %s\n", __FILE__, __LINE__, \
+                    cudaGetErrorString(err)); \
+            exit(EXIT_FAILURE); \
+        } \
+    } while(0)
 
 void allocateSubstates(Sciara *sciara)
 {
-	sciara->substates->Sz       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->Sz_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Sh       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->Sh_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->ST       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-  sciara->substates->ST_next  = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mf       = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols*NUMBER_OF_OUTFLOWS];
-//sciara->substates->Mv       = new (std::nothrow)    int[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mb       = new (std::nothrow)   bool[sciara->domain->rows*sciara->domain->cols];
-	sciara->substates->Mhs      = new (std::nothrow) double[sciara->domain->rows*sciara->domain->cols];
+    size_t size = sciara->domain->rows * sciara->domain->cols;
+
+    // Unified Memory allocation using cudaMallocManaged
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sz, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sz_next, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sh, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sh_next, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->ST, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->ST_next, size * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mf, size * NUMBER_OF_OUTFLOWS * sizeof(double)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mb, size * sizeof(bool)));
+    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mhs, size * sizeof(double)));
+
+    // Initialize to zero
+    CUDA_CHECK(cudaMemset(sciara->substates->Sz, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Sz_next, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Sh, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Sh_next, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->ST, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->ST_next, 0, size * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Mf, 0, size * NUMBER_OF_OUTFLOWS * sizeof(double)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Mb, 0, size * sizeof(bool)));
+    CUDA_CHECK(cudaMemset(sciara->substates->Mhs, 0, size * sizeof(double)));
 }
 
 void deallocateSubstates(Sciara *sciara)
 {
-	if(sciara->substates->Sz)       delete[] sciara->substates->Sz;
-  if(sciara->substates->Sz_next)  delete[] sciara->substates->Sz_next;
-	if(sciara->substates->Sh)       delete[] sciara->substates->Sh;
-  if(sciara->substates->Sh_next)  delete[] sciara->substates->Sh_next;
-	if(sciara->substates->ST)       delete[] sciara->substates->ST;
-  if(sciara->substates->ST_next)  delete[] sciara->substates->ST_next;
-	if(sciara->substates->Mf)       delete[] sciara->substates->Mf;
-//if(sciara->substates->Mv)       delete[] sciara->substates->Mv;
-	if(sciara->substates->Mb)       delete[] sciara->substates->Mb;
-	if(sciara->substates->Mhs)      delete[] sciara->substates->Mhs;
+    // Free Unified Memory using cudaFree
+    if(sciara->substates->Sz)       cudaFree(sciara->substates->Sz);
+    if(sciara->substates->Sz_next)  cudaFree(sciara->substates->Sz_next);
+    if(sciara->substates->Sh)       cudaFree(sciara->substates->Sh);
+    if(sciara->substates->Sh_next)  cudaFree(sciara->substates->Sh_next);
+    if(sciara->substates->ST)       cudaFree(sciara->substates->ST);
+    if(sciara->substates->ST_next)  cudaFree(sciara->substates->ST_next);
+    if(sciara->substates->Mf)       cudaFree(sciara->substates->Mf);
+    if(sciara->substates->Mb)       cudaFree(sciara->substates->Mb);
+    if(sciara->substates->Mhs)      cudaFree(sciara->substates->Mhs);
 }
 
 void evaluatePowerLawParams(double PTvent, double PTsol, double value_sol, double value_vent, double &k1, double &k2)
@@ -57,11 +82,11 @@ void simulationInitialize(Sciara* sciara)
 
   // compute a, b (viscosity parameters) and c, d (shear-resistance parameters)
   evaluatePowerLawParams(
-      sciara->parameters->PTvent, 
-      sciara->parameters->PTsol, 
-      sciara->parameters->Pr_Tsol,  
-      sciara->parameters->Pr_Tvent,  
-      sciara->parameters->a, 
+      sciara->parameters->PTvent,
+      sciara->parameters->PTsol,
+      sciara->parameters->Pr_Tsol,
+      sciara->parameters->Pr_Tvent,
+      sciara->parameters->a,
       sciara->parameters->b);
   evaluatePowerLawParams(
       sciara->parameters->PTvent,
@@ -107,7 +132,7 @@ void finalize(Sciara*& sciara)
   sciara = NULL;
 }
 
-void makeBorder(Sciara *sciara) 
+void makeBorder(Sciara *sciara)
 {
 	int j, i;
 
@@ -128,13 +153,13 @@ void makeBorder(Sciara *sciara)
 	for (i = 0; i < sciara->domain->rows; i++)
 		if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i, j) >= 0)
 			calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
-  
+
   // last column
 	j = sciara->domain->cols - 1;
 	for (i = 0; i < sciara->domain->rows; i++)
 		if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i, j) >= 0)
 			calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
-	
+
   // the rest
 	for (int i = 1; i < sciara->domain->rows - 1; i++)
 		for (int j = 1; j < sciara->domain->cols - 1; j++)
@@ -142,7 +167,7 @@ void makeBorder(Sciara *sciara)
 				for (int k = 1; k < MOORE_NEIGHBORS; k++)
 					if (calGetMatrixElement(sciara->substates->Sz, sciara->domain->cols, i+sciara->X->Xi[k], j+sciara->X->Xj[k]) < 0)
           {
-			      calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
+		      calSetMatrixElement(sciara->substates->Mb, sciara->domain->cols, i, j, true);
 						break;
 					}
 			}

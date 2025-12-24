@@ -3,11 +3,18 @@
  *
  * Uses shared memory with halo regions for complete neighbor access.
  *
+ * KERNELS (in order):
+ * 1. emitLava
+ * 2. computeOutflows
+ * 3. massBalance
+ * 4. computeNewTemperatureAndSolidification
+ * 5. boundaryConditions
+ *
  * OPTIMIZATIONS APPLIED:
  * 1. Pointer swapping instead of cudaMemcpy
- * 2. Direct vent update (no full-grid kernel for emitLava)
- * 3. Reduced cudaDeviceSynchronize calls
- * 4. Warp-level reduction with __shfl_down_sync
+ * 2. Reduced cudaDeviceSynchronize calls
+ * 3. Warp-level reduction with __shfl_down_sync
+ * 4. Block size 32x8 for memory coalescing
  */
 
 #include "Sciara.h"
@@ -115,7 +122,47 @@ __device__ void loadTileWithHaloBool(
 }
 
 // ----------------------------------------------------------------------------
-// CUDA Kernel: computeOutflows WITH Halo
+// CUDA Kernel 1: emitLava
+// ----------------------------------------------------------------------------
+__global__ void kernel_emitLava(
+    int r, int c,
+    double* __restrict__ Sh,
+    double* __restrict__ ST,
+    int* __restrict__ vent_indices,
+    double* __restrict__ emission_thicknesses,
+    double vent_temperature,
+    int num_vents)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= num_vents) return;
+
+    int cell_idx = vent_indices[idx];
+    double thickness = emission_thicknesses[idx];
+
+    if (thickness > 0) {
+        Sh[cell_idx] += thickness;
+        ST[cell_idx] = vent_temperature;
+    }
+}
+
+// ----------------------------------------------------------------------------
+// CUDA Kernel 5: boundaryConditions
+// Matches original serial behavior (currently disabled)
+// ----------------------------------------------------------------------------
+__global__ void kernel_boundaryConditions(
+    int r, int c,
+    double* __restrict__ Sz,
+    double* __restrict__ Sh,
+    double* __restrict__ ST,
+    bool* __restrict__ Mb)
+{
+    // In the original serial version, this function does nothing
+    // (the boundary is set once at initialization via makeBorder)
+    return;
+}
+
+// ----------------------------------------------------------------------------
+// CUDA Kernel 2: computeOutflows WITH Halo
 // ----------------------------------------------------------------------------
 __global__ void kernel_computeOutflows_halo(
     int r, int c,
@@ -440,13 +487,17 @@ int main(int argc, char **argv)
     double total_current_lava = -1;
     simulationInitialize(sciara);
 
-    // Prepare vent data - store indices for direct access
+    // Prepare vent data for GPU - using Unified Memory
     int num_vents = sciara->simulation->vent.size();
-    int* vent_indices = new int[num_vents];
+    int* d_vent_indices;
+    double* d_emission_thicknesses;
+    CUDA_CHECK(cudaMallocManaged(&d_vent_indices, num_vents * sizeof(int)));
+    CUDA_CHECK(cudaMallocManaged(&d_emission_thicknesses, num_vents * sizeof(double)));
+
     for (int k = 0; k < num_vents; k++) {
         int vx = sciara->simulation->vent[k].x();
         int vy = sciara->simulation->vent[k].y();
-        vent_indices[k] = vy * c + vx;
+        d_vent_indices[k] = vy * c + vx;
     }
 
     dim3 blockDim(TILE_SIZE, TILE_SIZE);
@@ -465,22 +516,28 @@ int main(int argc, char **argv)
         sciara->simulation->elapsed_time += sciara->parameters->Pclock;
         sciara->simulation->step++;
 
-        // OPTIMIZATION 2: Direct vent update via Unified Memory
+        // =========================================================
+        // Kernel 1: emitLava - Lava emission from vents
+        // =========================================================
         for (int k = 0; k < num_vents; k++) {
             double thickness = sciara->simulation->vent[k].thickness(
                 sciara->simulation->elapsed_time,
                 sciara->parameters->Pclock,
                 sciara->simulation->emission_time,
                 sciara->parameters->Pac);
-
+            d_emission_thicknesses[k] = thickness;
             sciara->simulation->total_emitted_lava += thickness;
-
-            int idx = vent_indices[k];
-            sciara->substates->Sh[idx] += thickness;
-            sciara->substates->ST[idx] = sciara->parameters->PTvent;
         }
+        int ventBlocks = (num_vents + 255) / 256;
+        kernel_emitLava<<<ventBlocks, 256>>>(
+            r, c,
+            sciara->substates->Sh, sciara->substates->ST,
+            d_vent_indices, d_emission_thicknesses,
+            sciara->parameters->PTvent, num_vents);
 
-        // 1. Compute Outflows
+        // =========================================================
+        // Kernel 2: computeOutflows - Calculate lava outflows
+        // =========================================================
         kernel_computeOutflows_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->substates->Sz, sciara->substates->Sh,
@@ -489,7 +546,9 @@ int main(int argc, char **argv)
             sciara->parameters->a, sciara->parameters->b,
             sciara->parameters->c, sciara->parameters->d);
 
-        // 2. Mass Balance
+        // =========================================================
+        // Kernel 3: massBalance - Update mass and temperature
+        // =========================================================
         kernel_massBalance_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->substates->Sh, sciara->substates->Sh_next,
@@ -497,11 +556,13 @@ int main(int argc, char **argv)
             sciara->substates->Mf);
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        // OPTIMIZATION 1: Pointer swap
+        // OPTIMIZATION: Pointer swap
         std::swap(sciara->substates->Sh, sciara->substates->Sh_next);
         std::swap(sciara->substates->ST, sciara->substates->ST_next);
 
-        // 3. Temperature and Solidification
+        // =========================================================
+        // Kernel 4: computeNewTemperatureAndSolidification
+        // =========================================================
         kernel_computeNewTemperatureAndSolidification_halo<<<gridDim, blockDim>>>(
             r, c,
             sciara->parameters->Pepsilon, sciara->parameters->Psigma,
@@ -514,13 +575,22 @@ int main(int argc, char **argv)
             sciara->substates->Mhs, sciara->substates->Mb);
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        // OPTIMIZATION 1: Pointer swap
+        // OPTIMIZATION: Pointer swap
         std::swap(sciara->substates->Sz, sciara->substates->Sz_next);
         std::swap(sciara->substates->Sh, sciara->substates->Sh_next);
         std::swap(sciara->substates->ST, sciara->substates->ST_next);
 
-        // 4. Reduction
+        // =========================================================
+        // Kernel 5: boundaryConditions - Apply boundary conditions
+        // =========================================================
+        kernel_boundaryConditions<<<gridDim, blockDim>>>(
+            r, c,
+            sciara->substates->Sz, sciara->substates->Sh,
+            sciara->substates->ST, sciara->substates->Mb);
+
+        // Reduction for stopping criterion
         if (sciara->simulation->step % reduceInterval == 0) {
+            CUDA_CHECK(cudaDeviceSynchronize());
             total_current_lava = reduceAddCUDA(sciara->substates->Sh, r * c);
         }
     }
@@ -534,7 +604,8 @@ int main(int argc, char **argv)
     printf("Saving output to %s...\n", argv[OUTPUT_PATH_ID]);
     saveConfiguration(argv[OUTPUT_PATH_ID], sciara);
 
-    delete[] vent_indices;
+    CUDA_CHECK(cudaFree(d_vent_indices));
+    CUDA_CHECK(cudaFree(d_emission_thicknesses));
 
     printf("Releasing memory...\n");
     finalize(sciara);
