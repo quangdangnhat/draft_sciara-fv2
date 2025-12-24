@@ -1,57 +1,32 @@
 #include "Sciara.h"
 #include "cal2DBuffer.h"
-#include <cuda_runtime.h>
-
-// CUDA error checking macro
-#define CUDA_CHECK(call) \
-    do { \
-        cudaError_t err = call; \
-        if (err != cudaSuccess) { \
-            fprintf(stderr, "CUDA error at %s:%d: %s\n", __FILE__, __LINE__, \
-                    cudaGetErrorString(err)); \
-            exit(EXIT_FAILURE); \
-        } \
-    } while(0)
 
 void allocateSubstates(Sciara *sciara)
 {
-    size_t size = sciara->domain->rows * sciara->domain->cols;
+    int size = sciara->domain->rows * sciara->domain->cols;
 
-    // Unified Memory allocation using cudaMallocManaged
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sz, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sz_next, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sh, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Sh_next, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->ST, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->ST_next, size * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mf, size * NUMBER_OF_OUTFLOWS * sizeof(double)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mb, size * sizeof(bool)));
-    CUDA_CHECK(cudaMallocManaged(&sciara->substates->Mhs, size * sizeof(double)));
-
-    // Initialize to zero
-    CUDA_CHECK(cudaMemset(sciara->substates->Sz, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Sz_next, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Sh, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Sh_next, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->ST, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->ST_next, 0, size * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Mf, 0, size * NUMBER_OF_OUTFLOWS * sizeof(double)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Mb, 0, size * sizeof(bool)));
-    CUDA_CHECK(cudaMemset(sciara->substates->Mhs, 0, size * sizeof(double)));
+    sciara->substates->Sz = new double[size]();
+    sciara->substates->Sz_next = new double[size]();
+    sciara->substates->Sh = new double[size]();
+    sciara->substates->Sh_next = new double[size]();
+    sciara->substates->ST = new double[size]();
+    sciara->substates->ST_next = new double[size]();
+    sciara->substates->Mf = new double[size * NUMBER_OF_OUTFLOWS]();
+    sciara->substates->Mb = new bool[size]();
+    sciara->substates->Mhs = new double[size]();
 }
 
 void deallocateSubstates(Sciara *sciara)
 {
-    // Free Unified Memory using cudaFree
-    if(sciara->substates->Sz)       cudaFree(sciara->substates->Sz);
-    if(sciara->substates->Sz_next)  cudaFree(sciara->substates->Sz_next);
-    if(sciara->substates->Sh)       cudaFree(sciara->substates->Sh);
-    if(sciara->substates->Sh_next)  cudaFree(sciara->substates->Sh_next);
-    if(sciara->substates->ST)       cudaFree(sciara->substates->ST);
-    if(sciara->substates->ST_next)  cudaFree(sciara->substates->ST_next);
-    if(sciara->substates->Mf)       cudaFree(sciara->substates->Mf);
-    if(sciara->substates->Mb)       cudaFree(sciara->substates->Mb);
-    if(sciara->substates->Mhs)      cudaFree(sciara->substates->Mhs);
+    delete[] sciara->substates->Sz;
+    delete[] sciara->substates->Sz_next;
+    delete[] sciara->substates->Sh;
+    delete[] sciara->substates->Sh_next;
+    delete[] sciara->substates->ST;
+    delete[] sciara->substates->ST_next;
+    delete[] sciara->substates->Mf;
+    delete[] sciara->substates->Mb;
+    delete[] sciara->substates->Mhs;
 }
 
 void evaluatePowerLawParams(double PTvent, double PTsol, double value_sol, double value_vent, double &k1, double &k2)
