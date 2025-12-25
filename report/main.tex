@@ -90,6 +90,15 @@ CfAMo       & 0 KB   & 64 & 50\%  & 18.5\% \\
 \end{tabular}
 \end{table}
 
+% Figure: Occupancy comparison chart
+\begin{figure}[H]
+\centering
+% \includegraphics[width=0.8\textwidth]{occupancy_chart.png}
+\fbox{\parbox{0.75\textwidth}{\centering\vspace{1.5cm}\texttt{occupancy\_chart.png}\vspace{1.5cm}}}
+\caption{Theoretical vs achieved GPU occupancy. CfAMo has lowest occupancy but best performance.}
+\label{fig:occupancy}
+\end{figure}
+
 \textbf{Key insight}: Higher occupancy $\neq$ better performance. CfAMo has lowest occupancy (18.5\%) but fastest execution because: (1) reduced memory transactions, (2) kernel fusion eliminates barriers, (3) sparse lava minimizes atomic contention.
 
 %==============================================================================
