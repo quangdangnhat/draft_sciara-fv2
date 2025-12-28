@@ -159,9 +159,9 @@ __global__ void kernel_emitLava(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: CfA_Mo - Memory Optimized Combined Kernel
 // No Mf buffer needed - flows computed and applied directly
+// NOTE: Removed __launch_bounds__ as it may hurt performance for high-register kernels
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 2)
-void kernel_CfA_Mo(
+__global__ void kernel_CfA_Mo(
     int r, int c,
     double* Sz, double* Sh, double* ST,
     double* Sh_next, double* ST_next,

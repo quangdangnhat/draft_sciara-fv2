@@ -164,9 +164,9 @@ __global__ void kernel_initBuffers_CfAMe(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: CfA_Me - Combined Outflows + Mass Balance
 // Each cell computes its outflows and atomically updates neighbors
+// NOTE: Removed __launch_bounds__ as it may hurt performance for high-register kernels
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 2)
-void kernel_CfA_Me(
+__global__ void kernel_CfA_Me(
     int r, int c,
     double* Sz, double* Sh, double* ST,
     double* Sh_next, double* ST_next,
