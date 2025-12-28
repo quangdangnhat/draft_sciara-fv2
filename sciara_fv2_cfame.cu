@@ -165,7 +165,8 @@ __global__ void kernel_initBuffers_CfAMe(
 // CUDA Kernel: CfA_Me - Combined Outflows + Mass Balance
 // Each cell computes its outflows and atomically updates neighbors
 // ----------------------------------------------------------------------------
-__global__ void kernel_CfA_Me(
+__global__ __launch_bounds__(256, 2)
+void kernel_CfA_Me(
     int r, int c,
     double* Sz, double* Sh, double* ST,
     double* Sh_next, double* ST_next,
@@ -196,6 +197,7 @@ __global__ void kernel_CfA_Me(
     double sz0 = GET(Sz, c, i, j);
 
     // Initialize neighbor data
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -222,6 +224,7 @@ __global__ void kernel_CfA_Me(
     theta[0] = 0;
     eliminated[0] = false;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -240,6 +243,7 @@ __global__ void kernel_CfA_Me(
         loop = false;
         avg = h[0];
         counter = 0;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -247,6 +251,7 @@ __global__ void kernel_CfA_Me(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -258,6 +263,7 @@ __global__ void kernel_CfA_Me(
     // Compute outflows and atomically update neighbors - use the final avg computed above
     double total_outflow = 0.0;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow = 0.0;
 
@@ -307,7 +313,8 @@ __global__ void kernel_normalizeTemperature(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeNewTemperatureAndSolidification(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeNewTemperatureAndSolidification(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,

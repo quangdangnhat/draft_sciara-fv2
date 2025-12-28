@@ -185,7 +185,8 @@ __global__ void kernel_emitLava_halo(
 // CUDA Kernel: computeOutflows WITH Halo
 // All neighbor accesses from shared memory
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeOutflows_halo(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeOutflows_halo(
     int r, int c,
     double* Sz, double* Sh, double* ST, double* Mf,
     double Pc, double _a, double _b, double _c, double _d)
@@ -232,6 +233,7 @@ __global__ void kernel_computeOutflows_halo(
     double sz0 = s_Sz[si][sj];
 
     // Initialize neighbor data - all from shared memory
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -261,6 +263,7 @@ __global__ void kernel_computeOutflows_halo(
     theta[0] = 0;
     eliminated[0] = false;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -279,6 +282,7 @@ __global__ void kernel_computeOutflows_halo(
         loop = false;
         avg = h[0];
         counter = 0;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -286,6 +290,7 @@ __global__ void kernel_computeOutflows_halo(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -295,6 +300,7 @@ __global__ void kernel_computeOutflows_halo(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -309,7 +315,8 @@ __global__ void kernel_computeOutflows_halo(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance WITH Halo
 // ----------------------------------------------------------------------------
-__global__ void kernel_massBalance_halo(
+__global__ __launch_bounds__(256, 4)
+void kernel_massBalance_halo(
     int r, int c,
     double* Sh, double* Sh_next,
     double* ST, double* ST_next,
@@ -343,6 +350,7 @@ __global__ void kernel_massBalance_halo(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
+    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -370,7 +378,8 @@ __global__ void kernel_massBalance_halo(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification WITH Halo
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeNewTemperatureAndSolidification_halo(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeNewTemperatureAndSolidification_halo(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,

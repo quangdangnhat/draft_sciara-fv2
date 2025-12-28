@@ -160,7 +160,8 @@ __global__ void kernel_emitLava(
 // CUDA Kernel: CfA_Mo - Memory Optimized Combined Kernel
 // No Mf buffer needed - flows computed and applied directly
 // ----------------------------------------------------------------------------
-__global__ void kernel_CfA_Mo(
+__global__ __launch_bounds__(256, 2)
+void kernel_CfA_Mo(
     int r, int c,
     double* Sz, double* Sh, double* ST,
     double* Sh_next, double* ST_next,
@@ -190,6 +191,7 @@ __global__ void kernel_CfA_Mo(
     double sz0 = GET(Sz, c, i, j);
 
     // Initialize neighbor data
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -216,6 +218,7 @@ __global__ void kernel_CfA_Mo(
     theta[0] = 0;
     eliminated[0] = false;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -232,6 +235,7 @@ __global__ void kernel_CfA_Mo(
         loop = false;
         double avg = h[0];
         int counter = 0;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -239,6 +243,7 @@ __global__ void kernel_CfA_Mo(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -250,6 +255,7 @@ __global__ void kernel_CfA_Mo(
     // Compute final average for flow calculation
     double final_avg = h[0];
     int final_counter = 0;
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         if (!eliminated[k]) {
             final_avg += H[k];
@@ -261,6 +267,7 @@ __global__ void kernel_CfA_Mo(
     // Compute and apply flows directly using atomic operations
     double total_outflow = 0.0;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
             double flow = Pr[k] * (final_avg - H[k]);
@@ -307,7 +314,8 @@ __global__ void kernel_normalizeTemperature(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeNewTemperatureAndSolidification(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeNewTemperatureAndSolidification(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,

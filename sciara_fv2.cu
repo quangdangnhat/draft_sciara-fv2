@@ -114,10 +114,14 @@ __global__ void kernel_emitLava(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeOutflows
+// OPTIMIZATION: __launch_bounds__ hints compiler for register allocation
+//               __restrict__ indicates no pointer aliasing
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeOutflows(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeOutflows(
     int r, int c,
-    double* Sz, double* Sh, double* ST, double* Mf,
+    double* __restrict__ Sz, double* __restrict__ Sh,
+    double* __restrict__ ST, double* __restrict__ Mf,
     double Pc, double _a, double _b, double _c, double _d)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -145,6 +149,8 @@ __global__ void kernel_computeOutflows(
     double sz0 = GET(Sz, c, i, j);
 
     // Initialize neighbor data
+    // OPTIMIZATION: #pragma unroll for constant-bound loop (9 iterations)
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -174,6 +180,7 @@ __global__ void kernel_computeOutflows(
     theta[0] = 0;
     eliminated[0] = false;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
 
@@ -194,6 +201,7 @@ __global__ void kernel_computeOutflows(
         avg = h[0];
         counter = 0;
 
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -204,6 +212,7 @@ __global__ void kernel_computeOutflows(
         if (counter != 0)
             avg = avg / (double)counter;
 
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -213,6 +222,7 @@ __global__ void kernel_computeOutflows(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -226,12 +236,14 @@ __global__ void kernel_computeOutflows(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance
+// OPTIMIZATION: __launch_bounds__ and __restrict__
 // ----------------------------------------------------------------------------
-__global__ void kernel_massBalance(
+__global__ __launch_bounds__(256, 4)
+void kernel_massBalance(
     int r, int c,
-    double* Sh, double* Sh_next,
-    double* ST, double* ST_next,
-    double* Mf)
+    double* __restrict__ Sh, double* __restrict__ Sh_next,
+    double* __restrict__ ST, double* __restrict__ ST_next,
+    double* __restrict__ Mf)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -246,6 +258,7 @@ __global__ void kernel_massBalance(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
+    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -270,15 +283,17 @@ __global__ void kernel_massBalance(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification
+// OPTIMIZATION: __launch_bounds__ and __restrict__
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeNewTemperatureAndSolidification(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeNewTemperatureAndSolidification(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
-    double* Sz, double* Sz_next,
-    double* Sh, double* Sh_next,
-    double* ST, double* ST_next,
-    double* Mhs, bool* Mb)
+    double* __restrict__ Sz, double* __restrict__ Sz_next,
+    double* __restrict__ Sh, double* __restrict__ Sh_next,
+    double* __restrict__ ST, double* __restrict__ ST_next,
+    double* __restrict__ Mhs, bool* __restrict__ Mb)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int i = blockIdx.y * blockDim.y + threadIdx.y;

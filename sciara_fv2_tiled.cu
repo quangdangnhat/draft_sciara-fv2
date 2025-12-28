@@ -131,12 +131,13 @@ __global__ void kernel_emitLava_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeOutflows (Tiled)
 // Uses shared memory for local tile data
-// NOTE: This kernel needs neighbor access, but without halo, we still read from global
-// for neighbors outside the tile. Tiled version improves coalescing.
+// OPTIMIZATION: __launch_bounds__ and __restrict__ for better register allocation
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeOutflows_tiled(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeOutflows_tiled(
     int r, int c,
-    double* Sz, double* Sh, double* ST, double* Mf,
+    double* __restrict__ Sz, double* __restrict__ Sh,
+    double* __restrict__ ST, double* __restrict__ Mf,
     double Pc, double _a, double _b, double _c, double _d)
 {
     // Shared memory for current tile
@@ -181,6 +182,7 @@ __global__ void kernel_computeOutflows_tiled(
     double sz0 = s_Sz[ty][tx];
 
     // Initialize neighbor data
+    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -221,6 +223,7 @@ __global__ void kernel_computeOutflows_tiled(
     theta[0] = 0;
     eliminated[0] = false;
 
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -239,6 +242,7 @@ __global__ void kernel_computeOutflows_tiled(
         loop = false;
         avg = h[0];
         counter = 0;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -246,6 +250,7 @@ __global__ void kernel_computeOutflows_tiled(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
+        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -255,6 +260,7 @@ __global__ void kernel_computeOutflows_tiled(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
+    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -269,7 +275,8 @@ __global__ void kernel_computeOutflows_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance (Tiled)
 // ----------------------------------------------------------------------------
-__global__ void kernel_massBalance_tiled(
+__global__ __launch_bounds__(256, 4)
+void kernel_massBalance_tiled(
     int r, int c,
     double* Sh, double* Sh_next,
     double* ST, double* ST_next,
@@ -302,6 +309,7 @@ __global__ void kernel_massBalance_tiled(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
+    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -336,7 +344,8 @@ __global__ void kernel_massBalance_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification (Tiled)
 // ----------------------------------------------------------------------------
-__global__ void kernel_computeNewTemperatureAndSolidification_tiled(
+__global__ __launch_bounds__(256, 4)
+void kernel_computeNewTemperatureAndSolidification_tiled(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
