@@ -496,7 +496,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<use xlink:href='#gpPt6' transform='translate(648.29,226.93) scale(5.40)' color='rgb(139,   0,   0)'/>
+	<use xlink:href='#gpPt6' transform='translate(645.57,259.94) scale(5.40)' color='rgb(139,   0,   0)'/>
 	<use xlink:href='#gpPt6' transform='translate(1136.76,652.40) scale(5.40)' color='rgb(139,   0,   0)'/>
 </g>
 	</g>
@@ -527,7 +527,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<use xlink:href='#gpPt4' transform='translate(652.46,234.35) scale(5.40)' color='rgb( 50, 205,  50)'/>
+	<use xlink:href='#gpPt4' transform='translate(652.08,264.26) scale(5.40)' color='rgb( 50, 205,  50)'/>
 	<use xlink:href='#gpPt4' transform='translate(1136.76,706.40) scale(5.40)' color='rgb( 50, 205,  50)'/>
 </g>
 	</g>
@@ -538,19 +538,19 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<use xlink:href='#gpPt10' transform='translate(658.25,242.02) scale(5.40)' color='rgb(255, 215,   0)'/>
+	<use xlink:href='#gpPt10' transform='translate(656.66,271.05) scale(5.40)' color='rgb(255, 215,   0)'/>
 	<use xlink:href='#gpPt10' transform='translate(1136.76,724.40) scale(5.40)' color='rgb(255, 215,   0)'/>
 </g>
 	</g>
 	<g id="gnuplot_plot_9" ><title>gnuplot_plot_9</title>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<g transform="translate(658.25,230.55)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+	<g transform="translate(656.66,259.58)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
 		<text><tspan font-family="Arial" >Tiled Halo</tspan></text>
 	</g>
-	<g transform="translate(652.46,222.88)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+	<g transform="translate(652.08,252.79)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
 		<text><tspan font-family="Arial" >Tiled</tspan></text>
 	</g>
-	<g transform="translate(648.29,215.46)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+	<g transform="translate(645.57,248.47)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
 		<text><tspan font-family="Arial" >Global</tspan></text>
 	</g>
 </g>

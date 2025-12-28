@@ -6,50 +6,7 @@
  * 2. Using a scatter-gather pattern with atomic operations
  * 3. Reducing total memory footprint
  *
- * MEMORY OPTIMIZATION:
- * --------------------
- * 1. Mf BUFFER ELIMINATION:
- *
- *    Standard/CfAMe:
- *    - Mf[8][rows][cols] = 8 × 517 × 378 × 8 bytes = 12.5 MB
- *    - Stores intermediate flows for debugging/verification
- *
- *    CfAMo:
- *    - No Mf buffer allocated
- *    - Flows computed inline and applied directly
- *    - Memory savings: 12.5 MB (for this grid)
- *
- * 2. IMPLICATIONS:
- *    - Cannot inspect intermediate flow values (debugging harder)
- *    - Better cache utilization (smaller working set)
- *    - Reduced memory bandwidth pressure
- *
- * 3. CODE DIFFERENCE from CfAMe:
- *    - No BUF_SET(Mf, ...) calls
- *    - Flow computed and used immediately
- *    - Same atomic update pattern
- *
- * PERFORMANCE: 1.16× speedup vs Global (BEST among all versions)
- *
- * WHY CfAMo IS FASTEST:
- * 1. Fewer kernel launches than Global/Tiled (no separate massBalance)
- * 2. Smaller memory footprint → better cache hit rate
- * 3. Atomic contention is low because:
- *    - Only ~30% of cells have active lava
- *    - Each cell sends at most 8 flows
- *    - Flows are sparse in practice
- *
- * OCCUPANCY NOTE:
- * - Lower occupancy (18.5%) than Global (58%)
- * - Due to higher register usage in combined kernel
- * - But overall performance is better due to reduced memory traffic
- *
- * ROOFLINE PLACEMENT:
- * - Measured AI very low (0.0002) due to atomic overhead
- * - Atomic operations counted as memory transactions by profiler
- * - Actual compute efficiency is higher than AI suggests
- *
- * See REPORT.md Section 5 and 6 for detailed analysis.
+ * Memory optimized: Eliminates the 8-layer Mf buffer.
  */
 
 #include "Sciara.h"
@@ -57,6 +14,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters
@@ -528,8 +486,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }

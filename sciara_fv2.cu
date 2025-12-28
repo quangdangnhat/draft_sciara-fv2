@@ -1,39 +1,9 @@
 /**
- * sciara_fv2.cu - CUDA Global Memory Version (BASELINE)
+ * sciara_fv2.cu - CUDA Global Memory Version
  *
  * CUDA implementation using only global memory.
  * All kernels access data directly from global memory.
  *
- * DESIGN DECISIONS:
- * -----------------
- * 1. BLOCK SIZE: 16x16 = 256 threads
- *    - Provides 100% theoretical occupancy on GTX 980 (8 blocks/SM)
- *    - Good balance between parallelism and register usage
- *    - Tested alternatives: 8x8, 32x32 - see block_size_exploration.cu
- *
- * 2. NO SHARED MEMORY (intentional baseline):
- *    - Baseline for comparison with optimized versions
- *    - Relies on L2 cache for data reuse (~2MB on GTX 980)
- *    - Simpler code, easier to verify correctness
- *
- * 3. KERNEL ORDER (per simulation step):
- *    a) emitLava         - Add lava from vents
- *    b) computeOutflows  - Calculate flow directions (HEAVIEST)
- *    c) massBalance      - Update thickness/temperature (70% of time)
- *    d) solidification   - Cool and solidify lava
- *    e) reduceAdd        - Global lava sum (periodic)
- *
- * PERFORMANCE CHARACTERISTICS:
- * - Memory-bound (AI ≈ 0.04 FLOP/Byte, ridge point = 0.69)
- * - Total GPU time: ~2.9s for 16,000 steps
- * - Achieves ~35 GFLOP/s on GTX 980
- *
- * WARP DIVERGENCE ANALYSIS:
- * - computeOutflows: ~15% divergent branches (early exit for h<=0)
- * - Acceptable because lava region is spatially coherent
- * - Alternative (not implemented): Active cell list would add overhead
- *
- * See REPORT.md for complete analysis.
  */
 
 #include "Sciara.h"
@@ -41,6 +11,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters used to index argv[]
@@ -525,8 +496,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }

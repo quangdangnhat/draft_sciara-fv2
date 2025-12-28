@@ -1,10 +1,11 @@
-==325568== NVPROF is profiling process 325568, command: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
-==325568== Profiling application: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
-==325568== Profiling result:
-==325568== Metric result:
+==559951== NVPROF is profiling process 559951, command: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==559951== Profiling application: ./sciara_cuda_cfame ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 10 10 1.0
+==559951== Profiling result:
+==559951== Metric result:
 "Device","Kernel","Invocations","Metric Name","Metric Description","Min","Max","Avg"
-"NVIDIA GeForce GTX 980 (0)","kernel_normalizeTemperature(int, int, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.778715,0.800832,0.789558
-"NVIDIA GeForce GTX 980 (0)","kernel_initBuffers_CfAMe(int, int, double*, double*, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.779075,0.810944,0.792242
-"NVIDIA GeForce GTX 980 (0)","kernel_reduceAdd(double*, double*, int)",2,"achieved_occupancy","Achieved Occupancy",0.103562,0.875449,0.489505
-"NVIDIA GeForce GTX 980 (0)","kernel_computeNewTemperatureAndSolidification(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)",10,"achieved_occupancy","Achieved Occupancy",0.689900,0.713051,0.698379
-"NVIDIA GeForce GTX 980 (0)","kernel_CfA_Me(int, int, double*, double*, double*, double*, double*, double*, double, double, double, double, double)",10,"achieved_occupancy","Achieved Occupancy",0.182118,0.186341,0.184979
+"NVIDIA GeForce GTX 980 (0)","kernel_normalizeTemperature(int, int, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.785471,0.820476,0.800965
+"NVIDIA GeForce GTX 980 (0)","kernel_initBuffers_CfAMe(int, int, double*, double*, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.778323,0.805357,0.791732
+"NVIDIA GeForce GTX 980 (0)","kernel_reduceAdd(double*, double*, int)",2,"achieved_occupancy","Achieved Occupancy",0.123250,0.906269,0.514759
+"NVIDIA GeForce GTX 980 (0)","kernel_computeNewTemperatureAndSolidification(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)",10,"achieved_occupancy","Achieved Occupancy",0.766505,0.789785,0.775865
+"NVIDIA GeForce GTX 980 (0)","kernel_CfA_Me(int, int, double*, double*, double*, double*, double*, double*, double, double, double, double, double)",10,"achieved_occupancy","Achieved Occupancy",0.180215,0.190704,0.184741
+"NVIDIA GeForce GTX 980 (0)","kernel_emitLava(int, int, int*, int*, double*, int, double, double*, double*, double*)",10,"achieved_occupancy","Achieved Occupancy",0.866882,0.868687,0.867787
