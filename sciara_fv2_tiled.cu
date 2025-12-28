@@ -4,7 +4,40 @@
  * Uses shared memory for tiling to improve memory access patterns.
  * Each tile loads its portion into shared memory without halo regions.
  *
- * Suitable for kernels that primarily access their own cell data.
+ * TILING STRATEGY:
+ * ----------------
+ * 1. WHY TILING:
+ *    - Reduce global memory traffic by caching tile data in shared memory
+ *    - Improve data reuse for neighbor access patterns
+ *    - Theoretical: 9 global reads → 1 global + 8 shared reads per cell
+ *
+ * 2. WHICH KERNELS ARE TILED (and why):
+ *    - emitLava: Vent coordinates in shared (broadcast to all threads)
+ *    - computeOutflows: Sz, Sh, ST tiles (9-point stencil pattern)
+ *    - massBalance: Sh, ST tiles (neighbor temperature access)
+ *    - solidification: Sz, Sh, ST, Mb tiles (coalesced loading)
+ *
+ * 3. WHY NO HALO (trade-off analysis):
+ *    - Simpler implementation, easier to verify
+ *    - Border threads (~25%) fall back to global memory
+ *    - Interior threads (~75%) get full shared memory benefit
+ *    - See sciara_fv2_tiled_halo.cu for halo version
+ *
+ * SHARED MEMORY USAGE:
+ * - computeOutflows: 3 × 16×16 × 8 = 6 KB per block
+ * - Max blocks/SM limited by registers, not shared memory
+ *
+ * PERFORMANCE NOTE (IMPORTANT):
+ * This version is SLOWER than Global for grid 517×378 due to:
+ * - __syncthreads() overhead (~50 cycles each)
+ * - Border threads still hit global memory
+ * - GTX 980 L2 cache (2MB) already provides good reuse
+ *
+ * WHEN TO USE:
+ * - Grids > 2048×2048 where L2 cache is insufficient
+ * - Memory-bound kernels with high neighbor reuse
+ *
+ * See REPORT.md Section 2 for detailed analysis.
  */
 
 #include "Sciara.h"

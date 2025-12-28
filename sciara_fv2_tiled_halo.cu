@@ -5,7 +5,48 @@
  * Each tile loads extra border cells (halo) to eliminate global memory
  * accesses for neighbor data.
  *
- * Tile layout: [HALO + TILE + HALO] in both dimensions
+ * HALO STRATEGY:
+ * --------------
+ * 1. TILE LAYOUT:
+ *    - Thread block: 16×16 = 256 threads
+ *    - Shared memory: 18×18 = 324 elements (16 + 2*HALO_SIZE)
+ *    - Each thread may load multiple elements (324/256 ≈ 1.27 per thread)
+ *
+ *    Visual layout:
+ *    +------------------+
+ *    |H H H H H H H H H |  <- Halo row (loaded from global)
+ *    |H T T T T T T T H |
+ *    |H T T T T T T T H |  <- T = Tile core (active threads)
+ *    |H T T T T T T T H |  <- H = Halo cells
+ *    |H H H H H H H H H |
+ *    +------------------+
+ *
+ * 2. LOADING PATTERN:
+ *    - Linear indexing: tid = ty*16 + tx
+ *    - Each thread loads elements at: tid, tid+256 (if < 324)
+ *    - Boundary handling: Out-of-grid cells set to default values
+ *
+ * 3. BENEFIT vs NO-HALO:
+ *    - 100% of threads access shared memory for ALL neighbors
+ *    - Zero global memory reads during computation phase
+ *    - Trade-off: More complex loading, ~27% more shared memory
+ *
+ * SHARED MEMORY USAGE:
+ * - computeOutflows: 3 × 18×18 × 8 = 7.8 KB per block
+ * - Still well under 48 KB limit
+ *
+ * BANK CONFLICT ANALYSIS:
+ * - 18×18 layout may cause bank conflicts on diagonal access
+ * - GTX 980: 32 banks, 4-byte stride
+ * - Mitigation: Could pad to 20×18 (not implemented)
+ *
+ * PERFORMANCE NOTE:
+ * Still SLOWER than Global for small grids due to:
+ * - Multiple passes for halo loading
+ * - __syncthreads() after loading
+ * - Overhead exceeds benefit for 517×378 grid
+ *
+ * See REPORT.md Section 2 for detailed analysis.
  */
 
 #include "Sciara.h"

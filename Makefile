@@ -154,12 +154,21 @@ profile: sciara_cuda
 	chmod +x run_profiling.sh
 	./run_profiling.sh
 
+######################
+# BLOCK SIZE EXPLORE #
+######################
+
+block_explore:
+	$(NVCC) $(NVFLAGS) block_size_exploration.cu -o block_explore
+	@echo "Running block size exploration..."
+	./block_explore
+
 ############
 # CLEAN UP #
 ############
 
 clean:
-	rm -f $(EXEC_OMP) $(EXEC_SERIAL) $(EXEC_CUDA) $(EXEC_CUDA_TILED) $(EXEC_CUDA_TILED_HALO) $(EXEC_CUDA_CFAME) $(EXEC_CUDA_CFAMO) *.o *out*
+	rm -f $(EXEC_OMP) $(EXEC_SERIAL) $(EXEC_CUDA) $(EXEC_CUDA_TILED) $(EXEC_CUDA_TILED_HALO) $(EXEC_CUDA_CFAME) $(EXEC_CUDA_CFAMO) block_explore *.o *out*
 
 wipe:
 	rm -f *.o *out*
@@ -169,4 +178,4 @@ clean-profile:
 
 clean-all: clean wipe clean-profile
 
-.PHONY: default all serial omp cuda cuda_tiled cuda_tiled_halo cuda_cfame cuda_cfamo sciara_cuda run run_omp run_cuda run_cuda_tiled run_cuda_tiled_halo run_cuda_cfame run_cuda_cfamo run_all_cuda benchmark clean wipe clean-profile clean-all profile
+.PHONY: default all serial omp cuda cuda_tiled cuda_tiled_halo cuda_cfame cuda_cfamo sciara_cuda run run_omp run_cuda run_cuda_tiled run_cuda_tiled_halo run_cuda_cfame run_cuda_cfamo run_all_cuda benchmark clean wipe clean-profile clean-all profile block_explore
