@@ -4,40 +4,7 @@
  * Uses shared memory for tiling to improve memory access patterns.
  * Each tile loads its portion into shared memory without halo regions.
  *
- * TILING STRATEGY:
- * ----------------
- * 1. WHY TILING:
- *    - Reduce global memory traffic by caching tile data in shared memory
- *    - Improve data reuse for neighbor access patterns
- *    - Theoretical: 9 global reads → 1 global + 8 shared reads per cell
- *
- * 2. WHICH KERNELS ARE TILED (and why):
- *    - emitLava: Vent coordinates in shared (broadcast to all threads)
- *    - computeOutflows: Sz, Sh, ST tiles (9-point stencil pattern)
- *    - massBalance: Sh, ST tiles (neighbor temperature access)
- *    - solidification: Sz, Sh, ST, Mb tiles (coalesced loading)
- *
- * 3. WHY NO HALO (trade-off analysis):
- *    - Simpler implementation, easier to verify
- *    - Border threads (~25%) fall back to global memory
- *    - Interior threads (~75%) get full shared memory benefit
- *    - See sciara_fv2_tiled_halo.cu for halo version
- *
- * SHARED MEMORY USAGE:
- * - computeOutflows: 3 × 16×16 × 8 = 6 KB per block
- * - Max blocks/SM limited by registers, not shared memory
- *
- * PERFORMANCE NOTE (IMPORTANT):
- * This version is SLOWER than Global for grid 517×378 due to:
- * - __syncthreads() overhead (~50 cycles each)
- * - Border threads still hit global memory
- * - GTX 980 L2 cache (2MB) already provides good reuse
- *
- * WHEN TO USE:
- * - Grids > 2048×2048 where L2 cache is insufficient
- * - Memory-bound kernels with high neighbor reuse
- *
- * See REPORT.md Section 2 for detailed analysis.
+ * Suitable for kernels that primarily access their own cell data.
  */
 
 #include "Sciara.h"
@@ -45,6 +12,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters
@@ -131,13 +99,12 @@ __global__ void kernel_emitLava_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeOutflows (Tiled)
 // Uses shared memory for local tile data
-// OPTIMIZATION: __launch_bounds__ and __restrict__ for better register allocation
+// NOTE: This kernel needs neighbor access, but without halo, we still read from global
+// for neighbors outside the tile. Tiled version improves coalescing.
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeOutflows_tiled(
+__global__ void kernel_computeOutflows_tiled(
     int r, int c,
-    double* __restrict__ Sz, double* __restrict__ Sh,
-    double* __restrict__ ST, double* __restrict__ Mf,
+    double* Sz, double* Sh, double* ST, double* Mf,
     double Pc, double _a, double _b, double _c, double _d)
 {
     // Shared memory for current tile
@@ -182,7 +149,6 @@ void kernel_computeOutflows_tiled(
     double sz0 = s_Sz[ty][tx];
 
     // Initialize neighbor data
-    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -223,7 +189,6 @@ void kernel_computeOutflows_tiled(
     theta[0] = 0;
     eliminated[0] = false;
 
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -242,7 +207,6 @@ void kernel_computeOutflows_tiled(
         loop = false;
         avg = h[0];
         counter = 0;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -250,7 +214,6 @@ void kernel_computeOutflows_tiled(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -260,7 +223,6 @@ void kernel_computeOutflows_tiled(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -275,8 +237,7 @@ void kernel_computeOutflows_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance (Tiled)
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_massBalance_tiled(
+__global__ void kernel_massBalance_tiled(
     int r, int c,
     double* Sh, double* Sh_next,
     double* ST, double* ST_next,
@@ -309,7 +270,6 @@ void kernel_massBalance_tiled(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
-    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -344,8 +304,7 @@ void kernel_massBalance_tiled(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification (Tiled)
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeNewTemperatureAndSolidification_tiled(
+__global__ void kernel_computeNewTemperatureAndSolidification_tiled(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
@@ -577,8 +536,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }

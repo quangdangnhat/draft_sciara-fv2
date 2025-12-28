@@ -5,54 +5,10 @@
  * using atomic operations to handle race conditions when multiple
  * threads update the same cell.
  *
- * ATOMIC SCATTER PATTERN:
- * -----------------------
- * 1. TRADITIONAL vs CfAMe:
+ * Key optimization: Each cell "scatters" its outflow to neighbors
+ * using atomicAdd, eliminating the need for separate flow/mass kernels.
  *
- *    Traditional (Gather):
- *    - computeOutflows: Cell writes flows to Mf[8]
- *    - massBalance: Cell reads flows FROM neighbors
- *    - Two kernel launches, Mf intermediate storage
- *
- *    CfAMe (Scatter):
- *    - Single kernel: Cell computes flows AND pushes to neighbors
- *    - atomicAdd(&Sh_next[neighbor], flow)
- *    - No separate massBalance kernel needed
- *
- * 2. WHY ATOMIC OPERATIONS:
- *    - Multiple cells may update same destination simultaneously
- *    - E.g., cell (5,5) receives flows from 8 neighbors
- *    - Without atomics: Race condition, lost updates
- *    - With atomics: Serialized but correct
- *
- * 3. ATOMIC IMPLEMENTATION (FP64):
- *    - CUDA < 6.0: No native atomicAdd for double
- *    - Use atomicCAS loop (compare-and-swap)
- *    - ~100 cycles per atomic vs ~4 cycles for normal write
- *
- * 4. TEMPERATURE ACCUMULATION TRICK:
- *    - Can't atomicAdd weighted average directly
- *    - Instead: ST_next stores h*T (mass-weighted sum)
- *    - After all updates: T = ST_next / Sh_next (normalize)
- *
- * WHY NOT TILED:
- * - Scatter pattern writes to RANDOM neighbor locations
- * - Neighbors may be in different tiles
- * - Shared memory can't help with scattered writes
- * - Global atomics are required regardless
- *
- * MEMORY EQUIVALENT:
- * - Still allocates Mf buffer (for debugging/comparison)
- * - See CfAMo for memory-optimized version without Mf
- *
- * PERFORMANCE: 1.10× speedup vs Global (fewer kernel launches)
- *
- * NUMERICAL NOTE:
- * - Atomic execution order is non-deterministic
- * - May produce slightly different results than Global/Tiled
- * - Differences are within FP64 precision (~1e-14)
- *
- * See REPORT.md Section 2.3 for detailed analysis.
+ * Memory equivalent: Uses same amount of memory as standard approach.
  */
 
 #include "Sciara.h"
@@ -60,6 +16,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters
@@ -164,7 +121,6 @@ __global__ void kernel_initBuffers_CfAMe(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: CfA_Me - Combined Outflows + Mass Balance
 // Each cell computes its outflows and atomically updates neighbors
-// NOTE: Removed __launch_bounds__ as it may hurt performance for high-register kernels
 // ----------------------------------------------------------------------------
 __global__ void kernel_CfA_Me(
     int r, int c,
@@ -197,7 +153,6 @@ __global__ void kernel_CfA_Me(
     double sz0 = GET(Sz, c, i, j);
 
     // Initialize neighbor data
-    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -224,7 +179,6 @@ __global__ void kernel_CfA_Me(
     theta[0] = 0;
     eliminated[0] = false;
 
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -243,7 +197,6 @@ __global__ void kernel_CfA_Me(
         loop = false;
         avg = h[0];
         counter = 0;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -251,7 +204,6 @@ __global__ void kernel_CfA_Me(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -263,7 +215,6 @@ __global__ void kernel_CfA_Me(
     // Compute outflows and atomically update neighbors - use the final avg computed above
     double total_outflow = 0.0;
 
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow = 0.0;
 
@@ -313,8 +264,7 @@ __global__ void kernel_normalizeTemperature(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeNewTemperatureAndSolidification(
+__global__ void kernel_computeNewTemperatureAndSolidification(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
@@ -536,8 +486,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }

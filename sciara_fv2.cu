@@ -1,39 +1,9 @@
 /**
- * sciara_fv2.cu - CUDA Global Memory Version (BASELINE)
+ * sciara_fv2.cu - CUDA Global Memory Version
  *
  * CUDA implementation using only global memory.
  * All kernels access data directly from global memory.
  *
- * DESIGN DECISIONS:
- * -----------------
- * 1. BLOCK SIZE: 16x16 = 256 threads
- *    - Provides 100% theoretical occupancy on GTX 980 (8 blocks/SM)
- *    - Good balance between parallelism and register usage
- *    - Tested alternatives: 8x8, 32x32 - see block_size_exploration.cu
- *
- * 2. NO SHARED MEMORY (intentional baseline):
- *    - Baseline for comparison with optimized versions
- *    - Relies on L2 cache for data reuse (~2MB on GTX 980)
- *    - Simpler code, easier to verify correctness
- *
- * 3. KERNEL ORDER (per simulation step):
- *    a) emitLava         - Add lava from vents
- *    b) computeOutflows  - Calculate flow directions (HEAVIEST)
- *    c) massBalance      - Update thickness/temperature (70% of time)
- *    d) solidification   - Cool and solidify lava
- *    e) reduceAdd        - Global lava sum (periodic)
- *
- * PERFORMANCE CHARACTERISTICS:
- * - Memory-bound (AI ≈ 0.04 FLOP/Byte, ridge point = 0.69)
- * - Total GPU time: ~2.9s for 16,000 steps
- * - Achieves ~35 GFLOP/s on GTX 980
- *
- * WARP DIVERGENCE ANALYSIS:
- * - computeOutflows: ~15% divergent branches (early exit for h<=0)
- * - Acceptable because lava region is spatially coherent
- * - Alternative (not implemented): Active cell list would add overhead
- *
- * See REPORT.md for complete analysis.
  */
 
 #include "Sciara.h"
@@ -41,6 +11,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters used to index argv[]
@@ -114,14 +85,10 @@ __global__ void kernel_emitLava(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeOutflows
-// OPTIMIZATION: __launch_bounds__ hints compiler for register allocation
-//               __restrict__ indicates no pointer aliasing
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeOutflows(
+__global__ void kernel_computeOutflows(
     int r, int c,
-    double* __restrict__ Sz, double* __restrict__ Sh,
-    double* __restrict__ ST, double* __restrict__ Mf,
+    double* Sz, double* Sh, double* ST, double* Mf,
     double Pc, double _a, double _b, double _c, double _d)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -149,8 +116,6 @@ void kernel_computeOutflows(
     double sz0 = GET(Sz, c, i, j);
 
     // Initialize neighbor data
-    // OPTIMIZATION: #pragma unroll for constant-bound loop (9 iterations)
-    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -180,7 +145,6 @@ void kernel_computeOutflows(
     theta[0] = 0;
     eliminated[0] = false;
 
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
 
@@ -201,7 +165,6 @@ void kernel_computeOutflows(
         avg = h[0];
         counter = 0;
 
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -212,7 +175,6 @@ void kernel_computeOutflows(
         if (counter != 0)
             avg = avg / (double)counter;
 
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -222,7 +184,6 @@ void kernel_computeOutflows(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -236,14 +197,12 @@ void kernel_computeOutflows(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance
-// OPTIMIZATION: __launch_bounds__ and __restrict__
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_massBalance(
+__global__ void kernel_massBalance(
     int r, int c,
-    double* __restrict__ Sh, double* __restrict__ Sh_next,
-    double* __restrict__ ST, double* __restrict__ ST_next,
-    double* __restrict__ Mf)
+    double* Sh, double* Sh_next,
+    double* ST, double* ST_next,
+    double* Mf)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -258,7 +217,6 @@ void kernel_massBalance(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
-    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -283,17 +241,15 @@ void kernel_massBalance(
 
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification
-// OPTIMIZATION: __launch_bounds__ and __restrict__
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeNewTemperatureAndSolidification(
+__global__ void kernel_computeNewTemperatureAndSolidification(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
-    double* __restrict__ Sz, double* __restrict__ Sz_next,
-    double* __restrict__ Sh, double* __restrict__ Sh_next,
-    double* __restrict__ ST, double* __restrict__ ST_next,
-    double* __restrict__ Mhs, bool* __restrict__ Mb)
+    double* Sz, double* Sz_next,
+    double* Sh, double* Sh_next,
+    double* ST, double* ST_next,
+    double* Mhs, bool* Mb)
 {
     int j = blockIdx.x * blockDim.x + threadIdx.x;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -540,8 +496,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }

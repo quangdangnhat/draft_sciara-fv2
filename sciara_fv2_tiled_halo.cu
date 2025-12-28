@@ -5,48 +5,7 @@
  * Each tile loads extra border cells (halo) to eliminate global memory
  * accesses for neighbor data.
  *
- * HALO STRATEGY:
- * --------------
- * 1. TILE LAYOUT:
- *    - Thread block: 16×16 = 256 threads
- *    - Shared memory: 18×18 = 324 elements (16 + 2*HALO_SIZE)
- *    - Each thread may load multiple elements (324/256 ≈ 1.27 per thread)
- *
- *    Visual layout:
- *    +------------------+
- *    |H H H H H H H H H |  <- Halo row (loaded from global)
- *    |H T T T T T T T H |
- *    |H T T T T T T T H |  <- T = Tile core (active threads)
- *    |H T T T T T T T H |  <- H = Halo cells
- *    |H H H H H H H H H |
- *    +------------------+
- *
- * 2. LOADING PATTERN:
- *    - Linear indexing: tid = ty*16 + tx
- *    - Each thread loads elements at: tid, tid+256 (if < 324)
- *    - Boundary handling: Out-of-grid cells set to default values
- *
- * 3. BENEFIT vs NO-HALO:
- *    - 100% of threads access shared memory for ALL neighbors
- *    - Zero global memory reads during computation phase
- *    - Trade-off: More complex loading, ~27% more shared memory
- *
- * SHARED MEMORY USAGE:
- * - computeOutflows: 3 × 18×18 × 8 = 7.8 KB per block
- * - Still well under 48 KB limit
- *
- * BANK CONFLICT ANALYSIS:
- * - 18×18 layout may cause bank conflicts on diagonal access
- * - GTX 980: 32 banks, 4-byte stride
- * - Mitigation: Could pad to 20×18 (not implemented)
- *
- * PERFORMANCE NOTE:
- * Still SLOWER than Global for small grids due to:
- * - Multiple passes for halo loading
- * - __syncthreads() after loading
- * - Overhead exceeds benefit for 517×378 grid
- *
- * See REPORT.md Section 2 for detailed analysis.
+ * Tile layout: [HALO + TILE + HALO] in both dimensions
  */
 
 #include "Sciara.h"
@@ -54,6 +13,7 @@
 #include "util.hpp"
 #include <cuda_runtime.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 // ----------------------------------------------------------------------------
 // I/O parameters
@@ -185,8 +145,7 @@ __global__ void kernel_emitLava_halo(
 // CUDA Kernel: computeOutflows WITH Halo
 // All neighbor accesses from shared memory
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeOutflows_halo(
+__global__ void kernel_computeOutflows_halo(
     int r, int c,
     double* Sz, double* Sh, double* ST, double* Mf,
     double Pc, double _a, double _b, double _c, double _d)
@@ -233,7 +192,6 @@ void kernel_computeOutflows_halo(
     double sz0 = s_Sz[si][sj];
 
     // Initialize neighbor data - all from shared memory
-    #pragma unroll
     for (int k = 0; k < MOORE_NEIGHBORS; k++) {
         int ni = i + d_Xi[k];
         int nj = j + d_Xj[k];
@@ -263,7 +221,6 @@ void kernel_computeOutflows_halo(
     theta[0] = 0;
     eliminated[0] = false;
 
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         if (eliminated[k]) continue;
         if (z[0] + h[0] > z[k] + h[k]) {
@@ -282,7 +239,6 @@ void kernel_computeOutflows_halo(
         loop = false;
         avg = h[0];
         counter = 0;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k]) {
                 avg += H[k];
@@ -290,7 +246,6 @@ void kernel_computeOutflows_halo(
             }
         }
         if (counter != 0) avg = avg / (double)counter;
-        #pragma unroll
         for (int k = 0; k < MOORE_NEIGHBORS; k++) {
             if (!eliminated[k] && avg <= H[k]) {
                 eliminated[k] = true;
@@ -300,7 +255,6 @@ void kernel_computeOutflows_halo(
     } while (loop);
 
     // Compute outflows - use the final avg computed above
-    #pragma unroll
     for (int k = 1; k < MOORE_NEIGHBORS; k++) {
         double flow;
         if (!eliminated[k] && h[0] > hc * cos(theta[k])) {
@@ -315,8 +269,7 @@ void kernel_computeOutflows_halo(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: massBalance WITH Halo
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_massBalance_halo(
+__global__ void kernel_massBalance_halo(
     int r, int c,
     double* Sh, double* Sh_next,
     double* ST, double* ST_next,
@@ -350,7 +303,6 @@ void kernel_massBalance_halo(
     double h_next = initial_h;
     double t_next = initial_h * initial_t;
 
-    #pragma unroll
     for (int n = 1; n < MOORE_NEIGHBORS; n++) {
         int ni = i + d_Xi[n];
         int nj = j + d_Xj[n];
@@ -378,8 +330,7 @@ void kernel_massBalance_halo(
 // ----------------------------------------------------------------------------
 // CUDA Kernel: computeNewTemperatureAndSolidification WITH Halo
 // ----------------------------------------------------------------------------
-__global__ __launch_bounds__(256, 4)
-void kernel_computeNewTemperatureAndSolidification_halo(
+__global__ void kernel_computeNewTemperatureAndSolidification_halo(
     int r, int c,
     double Pepsilon, double Psigma, double Pclock, double Pcool,
     double Prho, double Pcv, double Pac, double PTsol,
@@ -614,8 +565,28 @@ int main(int argc, char **argv)
     CUDA_CHECK(cudaFree(d_vent_y));
     CUDA_CHECK(cudaFree(d_vent_thickness));
 
+    // Save step before finalize frees memory
+    int final_step = sciara->simulation->step;
+
     printf("Releasing memory...\n");
     finalize(sciara);
+
+    // Print MD5 checksums of output files
+    char cmd[512];
+    const char* outPath = argv[OUTPUT_PATH_ID];
+
+    sprintf(cmd, "md5sum %s_%012d_Temperature.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_EmissionRate.txt", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_SolidifiedLavaThickness.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Morphology.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Vents.asc", outPath, final_step);
+    system(cmd);
+    sprintf(cmd, "md5sum %s_%012d_Thickness.asc", outPath, final_step);
+    system(cmd);
 
     return 0;
 }
