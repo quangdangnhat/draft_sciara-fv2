@@ -246,25 +246,37 @@ def parse_one_dataset(base):
 def calc_roofline_point(total_flops, total_bytes, time_s, version_name, kernel_name=""):
     """
     Calcola un punto per il roofline plot.
-    Returns: (gflops, ai_dram, ai_l1, ai_shared) o None se i dati non sono validi
+    Returns: (gflops, ai) o None se i dati non sono validi
+
+    NOTE: FLOPs and bytes come from REDUCED_STEPS run (10 steps),
+          but time comes from full STEPS run (16000 steps).
+          We scale FLOPs by STEPS/REDUCED_STEPS to match.
     """
+    STEPS = 16000
+    REDUCED_STEPS = 10
+    SCALE_FACTOR = STEPS / REDUCED_STEPS  # 1600
+
     if time_s <= 0 or total_flops <= 0:
         print(f"  Warning [{version_name}{' - ' + kernel_name if kernel_name else ''}]: Invalid data (time={time_s:.6f}s, flops={total_flops:.2e})")
         return None
-    
-    # GFLOPS = FLOP totali / tempo totale / 1e5
-    gflops = (total_flops / time_s) / 1e5
-    
-    # Arithmetic Intensity = FLOP / Byte
+
+    # Scale FLOPs from 10-step measurement to full 16000-step run
+    scaled_flops = total_flops * SCALE_FACTOR
+
+    # GFLOPS = FLOP totali / tempo totale / 1e9 (correct divisor for Giga)
+    gflops = (scaled_flops / time_s) / 1e9
+
+    # Arithmetic Intensity = FLOP / Byte (ratio is same regardless of steps)
     ai = total_flops / max(1.0, total_bytes)
-    
+
     # Debug output
     print(f"  [{version_name}{' - ' + kernel_name if kernel_name else ''}]:")
-    print(f"    FLOP total: {total_flops:.2e}")
+    print(f"    FLOP (10 steps): {total_flops:.2e}")
+    print(f"    FLOP (scaled to 16000): {scaled_flops:.2e}")
     print(f"    Time: {time_s:.6f} s")
-    print(f"    GFLOPS: {gflops:.4f}")
+    print(f"    GFLOP/s: {gflops:.4f}")
     print(f"    Total bytes: {total_bytes:.2e} -> AI: {ai:.4f} FLOP/byte")
-    
+
     return gflops, ai
 
 def main():
