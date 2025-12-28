@@ -8,6 +8,8 @@ set grid ytics
 set yrange [0:1]
 set key off
 
+# Note: Version names use underscores in data file (e.g., "Tiled_Halo")
+
 # PNG output
 set terminal png size 1200,600 enhanced font 'Arial,12'
 set output './profiling_results/occupancy.png'

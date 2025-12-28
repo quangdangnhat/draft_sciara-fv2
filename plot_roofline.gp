@@ -41,15 +41,16 @@ get_ls(version) = (version eq "Global" ? 10 : version eq "Cfame" ? 11 : version 
 set terminal png size 1200,800 enhanced font 'Arial,12'
 set output './profiling_results/roofline_fp64.png'
 
+# Note: Version names now use underscores instead of spaces (e.g., "Tiled_Halo")
 plot \
     roof(bw_dram, x)    ls 1 lw 2 title "DRAM Roofline", \
     roof(bw_l1, x)      ls 1 lw 2 title "L1 Roofline", \
     roof(bw_shared, x)  ls 1 lw 2 title "Shared Roofline", \
-    'profiling_results/roofline_data.dat' using (stringcolumn(4) eq "Global"       ? $2 : 1/0):3 with points ls 10 title "Global", \
-    '' using (stringcolumn(4) eq "Cfame"        ? $2 : 1/0):3 with points ls 11 title "Cfame", \
-    '' using (stringcolumn(4) eq "Cfamo"        ? $2 : 1/0):3 with points ls 12 title "Cfamo", \
-    '' using (stringcolumn(4) eq "Tiled"        ? $2 : 1/0):3 with points ls 13 title "Tiled", \
-    '' using (stringcolumn(4) eq "Tiled Halo"   ? $2 : 1/0):3 with points ls 14 title "Tiled Halo", \
+    'profiling_results/roofline_data.dat' using (stringcolumn(4) eq "Global"      ? $2 : 1/0):3 with points ls 10 title "Global", \
+    '' using (stringcolumn(4) eq "Cfame"       ? $2 : 1/0):3 with points ls 11 title "Cfame", \
+    '' using (stringcolumn(4) eq "Cfamo"       ? $2 : 1/0):3 with points ls 12 title "Cfamo", \
+    '' using (stringcolumn(4) eq "Tiled"       ? $2 : 1/0):3 with points ls 13 title "Tiled", \
+    '' using (stringcolumn(4) eq "Tiled_Halo"  ? $2 : 1/0):3 with points ls 14 title "Tiled Halo", \
     '' using 2:3:1 with labels center offset 0,0.8 font ",9" notitle
 
 # SVG output

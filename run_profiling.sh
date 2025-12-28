@@ -3,9 +3,10 @@
 # Configuration
 INPUT_CONFIG="./data/2006/2006_000000000000.cfg"
 OUTPUT_CONFIG="./data/2006/output_2006"
+# Use same STEPS for all metrics to ensure consistency
 STEPS=16000
-REDUCED_STEPS=10
-REDUCED_STEPS_INTERVAL=10
+PROFILING_STEPS=16000        # Same as STEPS for consistent FLOP/memory measurements
+PROFILING_STEPS_INTERVAL=1000
 REDUCE_INTERVAL=1000
 THICKNESS_THRESHOLD=1.0
 
@@ -60,21 +61,22 @@ for exe in $EXECUTABLES; do
         ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $STEPS $REDUCE_INTERVAL $THICKNESS_THRESHOLD > "${OUTPUT_PROFILE}/${exe_name}.log" 2>&1
 
     # 2. Compute Metrics (FP64, FP32, FP16 FLOP counts)
+    # IMPORTANT: Use same STEPS as execution time measurement for consistent GFLOPS calculation
     echo "[2/4] Collecting Compute Metrics (FLOP counts)..."
     nvprof --metrics flop_count_dp,flop_count_sp,flop_count_hp --log-file "${OUTPUT_PROFILE}/${exe_name}_compute.csv" --csv \
-        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $REDUCED_STEPS $REDUCED_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
+        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $PROFILING_STEPS $PROFILING_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
 
     # 3. Memory Hierarchy: Transaction Counts
     echo "[3/4] Collecting Memory Metrics (Transaction Counts)..."
     nvprof --metrics gld_transactions,gst_transactions,atomic_transactions,local_load_transactions,local_store_transactions,shared_load_transactions,shared_store_transactions,l2_read_transactions,l2_write_transactions,dram_read_transactions,dram_write_transactions \
         --log-file "${OUTPUT_PROFILE}/${exe_name}_memory.csv" --csv \
-        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $REDUCED_STEPS $REDUCED_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
+        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $PROFILING_STEPS $PROFILING_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
 
     # 4. Occupancy (Achieved Occupancy)
     echo "[4/4] Collecting Occupancy Metric (achieved_occupancy)..."
     nvprof --metrics achieved_occupancy \
         --log-file "${OUTPUT_PROFILE}/${exe_name}_occupancy.csv" --csv \
-        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $REDUCED_STEPS $REDUCED_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
+        ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $PROFILING_STEPS $PROFILING_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
     echo "      -> Done. Logs saved to ${exe_name}_*.csv"
 done
 
