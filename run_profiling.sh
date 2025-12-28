@@ -43,8 +43,21 @@ echo "=========================================================="
 echo " [2/4] BENCHMARK: Measuring ACTUAL Execution Time (NO nvprof)"
 echo "=========================================================="
 
+# Sort executables for consistent order (matches Makefile order)
+SORTED_EXECS=$(echo "$EXECUTABLES" | tr ' ' '\n' | sort -r | tr '\n' ' ')
+
 echo "Running each executable WITHOUT profiler overhead..."
-for exe in $EXECUTABLES; do
+echo "Execution order: $(echo $SORTED_EXECS | tr '\n' ' ')"
+
+# GPU Warmup: Run a short simulation to stabilize GPU clocks/thermals
+echo "  [Warmup] Stabilizing GPU state..."
+first_exe=$(echo $SORTED_EXECS | awk '{print $1}')
+if [ -n "$first_exe" ]; then
+    $first_exe $INPUT_CONFIG $OUTPUT_CONFIG 100 100 $THICKNESS_THRESHOLD > /dev/null 2>&1
+fi
+
+# Actual benchmark runs
+for exe in $SORTED_EXECS; do
     exe_name=$(basename "$exe")
     echo "  Benchmarking: $exe_name"
     # Run WITHOUT nvprof to get actual wall-clock time
@@ -56,10 +69,10 @@ echo "=========================================================="
 echo " [3/4] PROFILING: Collecting GPU Metrics (with nvprof)"
 echo "=========================================================="
 
-echo "Executables to be profiled:"
-echo "$EXECUTABLES"
+echo "Executables to be profiled (same order as benchmark):"
+echo "$SORTED_EXECS"
 
-for exe in $EXECUTABLES; do
+for exe in $SORTED_EXECS; do
     exe_name=$(basename "$exe")
 
     echo ""
