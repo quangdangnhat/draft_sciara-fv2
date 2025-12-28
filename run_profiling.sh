@@ -16,7 +16,7 @@ mkdir -p "$OUTPUT_PROFILE"
 EXECUTABLES=$(find . -maxdepth 1 -type f -name "*cuda*" ! -name "*.*" -executable)
 
 echo "=========================================================="
-echo " [1/3] RUNNING GPUMEMBENCH (Microbenchmark)"
+echo " [1/4] RUNNING GPUMEMBENCH (Microbenchmark)"
 echo "=========================================================="
 
 # Check if gpumembench exists, if not, try to compile it from source
@@ -40,7 +40,20 @@ else
 fi
 
 echo "=========================================================="
-echo " [2/3] STARTING AUTOMATED PROFILING (STEPS=$STEPS)"
+echo " [2/4] BENCHMARK: Measuring ACTUAL Execution Time (NO nvprof)"
+echo "=========================================================="
+
+echo "Running each executable WITHOUT profiler overhead..."
+for exe in $EXECUTABLES; do
+    exe_name=$(basename "$exe")
+    echo "  Benchmarking: $exe_name"
+    # Run WITHOUT nvprof to get actual wall-clock time
+    ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $STEPS $REDUCE_INTERVAL $THICKNESS_THRESHOLD > "${OUTPUT_PROFILE}/${exe_name}_benchmark.log" 2>&1
+done
+echo "Benchmark complete. Times saved to *_benchmark.log files."
+
+echo "=========================================================="
+echo " [3/4] PROFILING: Collecting GPU Metrics (with nvprof)"
 echo "=========================================================="
 
 echo "Executables to be profiled:"
@@ -54,8 +67,8 @@ for exe in $EXECUTABLES; do
     echo " Profiling: $exe_name"
     echo "----------------------------------------------------------"
 
-    # 1. Execution Time (Total)
-    echo "[1/4] Measuring Execution Time..."
+    # 1. GPU Summary (kernel times - for roofline calculation)
+    echo "[1/4] Collecting GPU Summary..."
     nvprof --print-gpu-summary --log-file "${OUTPUT_PROFILE}/${exe_name}_gpu_summary.csv" --csv \
         ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $STEPS $REDUCE_INTERVAL $THICKNESS_THRESHOLD > "${OUTPUT_PROFILE}/${exe_name}.log" 2>&1
 
@@ -79,7 +92,7 @@ for exe in $EXECUTABLES; do
 done
 
 echo "========================================================="
-echo " [3/3] PARSING METRICS AND PLOTTING RESULTS"
+echo " [4/4] PARSING METRICS AND PLOTTING RESULTS"
 echo "========================================================="
 
 python3 parse_metrics.py

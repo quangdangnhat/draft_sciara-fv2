@@ -111,15 +111,38 @@ def read_csv_with_units(path):
     return rows
 
 def parse_elapsed_from_logs():
-    # Look for profiling_results/*.log and lines like: Elapsed time [s]: 12.34
+    """
+    Parse elapsed time from benchmark logs (without nvprof overhead).
+    Prefers *_benchmark.log files, falls back to *.log if not found.
+    """
     times = {}
-    for p in glob.glob(os.path.join(RESULTS_DIR, '*.log')):
-        name = os.path.basename(p).split('.')[0]
+
+    # First, try to read from _benchmark.log files (accurate, no nvprof overhead)
+    for p in glob.glob(os.path.join(RESULTS_DIR, '*_benchmark.log')):
+        # Extract base name: sciara_cuda_cfamo_benchmark.log -> sciara_cuda_cfamo
+        name = os.path.basename(p).replace('_benchmark.log', '')
         with open(p, 'r') as f:
             for L in f:
                 m = re.search(r'Elapsed time \[s\]:\s*([0-9\.]+)', L)
                 if m:
                     times[name] = float(m.group(1))
+                    break
+
+    # Fallback: if no benchmark logs found, use regular logs (with nvprof overhead)
+    if not times:
+        print("Warning: No *_benchmark.log files found. Using *.log (may include nvprof overhead)")
+        for p in glob.glob(os.path.join(RESULTS_DIR, '*.log')):
+            if '_benchmark' in p or '_gpu_summary' in p or '_compute' in p or '_memory' in p or '_occupancy' in p:
+                continue
+            name = os.path.basename(p).split('.')[0]
+            with open(p, 'r') as f:
+                for L in f:
+                    m = re.search(r'Elapsed time \[s\]:\s*([0-9\.]+)', L)
+                    if m:
+                        times[name] = float(m.group(1))
+                        break
+
+    print(f"Parsed execution times: {times}")
     return times
 
 def clean_version(base_name):
