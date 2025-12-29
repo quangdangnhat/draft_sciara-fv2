@@ -1,4 +1,4 @@
-% LNCS format - Compact 3-4 page version
+% LNCS format - Sciara-fv2 CUDA Performance Report
 \documentclass[runningheads]{llncs}
 
 \usepackage{graphicx}
@@ -6,191 +6,227 @@
 \usepackage{amsmath}
 \usepackage{float}
 
-\graphicspath{{./figures/}{./images/}{../}}
+\graphicspath{{./figures/}{./images/}{../profiling_results/}}
 
 \begin{document}
 
-\title{CUDA Performance Analysis of Sciara-fv2:\\Execution Time, Roofline, and GPU Occupancy}
+\title{CUDA Parallelization and Performance Analysis\\of the Sciara-fv2 Lava Flow Simulator}
 
 \author{Author Name}
 \authorrunning{Author Name}
-\institute{University Name \email{author@university.edu}}
+\institute{University of Calabria \email{author@unical.it}}
 
 \maketitle
 
 \begin{abstract}
-We analyze five CUDA implementations of the Sciara-fv2 lava flow simulator focusing on execution time, Roofline model, GPU occupancy, and FLOP count. Experiments on GTX 980 show all versions are memory-bound (AI $<$ 0.1 FLOP/Byte). The atomic version CfAMo achieves 1.16$\times$ speedup despite 18.5\% occupancy vs 58-64\% for other versions.
-\keywords{CUDA \and Roofline \and GPU Occupancy \and FLOP Count}
+This report presents CUDA parallelization strategies for Sciara-fv2, a cellular automata-based lava flow simulator. We implement and analyze five CUDA versions: Global (baseline), Tiled, Tiled with Halo, CfAMe, and CfAMo. Experiments on NVIDIA GTX 980 demonstrate that all implementations are memory-bound with arithmetic intensity below 0.05 FLOP/Byte. CfAMo achieves the best performance (8.6\% speedup) through kernel fusion and reduced memory footprint, despite introducing checksum differences due to floating-point non-associativity in atomic operations.
+\keywords{CUDA \and Cellular Automata \and Roofline Model \and GPU Computing}
 \end{abstract}
 
 %==============================================================================
 \section{Introduction}
 %==============================================================================
 
-Sciara-fv2 simulates lava flows using cellular automata on a 2D grid with Moore neighborhood (9-cell stencil). Each step has four phases: lava emission, outflow computation, mass balance, and solidification. We implement five CUDA versions: Global memory baseline, Tiled shared memory (with/without halo), and Conflict-free atomic (CfAMe/CfAMo).
+Sciara-fv2 is a Cellular Automata (CA) model for simulating lava flows, developed to predict volcanic hazards~\cite{sciara}. The model discretizes terrain into a 2D grid where each cell contains substates (elevation, lava thickness, temperature) and evolves through local transition rules based on the Moore neighborhood (9-cell stencil).
 
-\textbf{Hardware}: NVIDIA GTX 980 (Maxwell, 16 SMs, 2048 cores, 224.3 GB/s bandwidth, 4.98 TFLOP/s FP32 peak).
+The simulation executes four sequential phases per time step: (1) lava emission from vents, (2) outflow computation using the minimization algorithm, (3) mass and heat balance among neighbors, and (4) temperature cooling and solidification. The inherent data parallelism---each cell can be processed independently within a phase---makes this model suitable for GPU acceleration.
 
-\textbf{Dataset}: Mt. Etna 2006 eruption, 517$\times$378 cells, 16,000 steps, block size 16$\times$16.
+This project implements five CUDA parallelization strategies with the objectives: exploit different GPU memory hierarchies (global, shared, constant), evaluate tiling strategies for stencil computations, apply kernel fusion with atomic operations (CfA approach), and conduct Roofline analysis to identify performance bottlenecks.
+
+\textbf{Hardware:} NVIDIA GeForce GTX 980 (Maxwell, 16 SMs, 2048 cores, 224.3 GB/s bandwidth, 155.7 GFLOP/s FP64 peak).
+
+\textbf{Dataset:} Mt. Etna 2006 eruption, 517$\times$378 cells, 16,000 steps, block size 16$\times$16.
 
 %==============================================================================
-\section{Execution Time Analysis}
+\section{Sciara-fv2 Model and Parallelization Strategy}
 %==============================================================================
 
-Table~\ref{tab:time} shows execution times and speedup for all versions.
+\subsection{Cellular Automata Kernels}
+
+The simulation comprises five computational kernels: \texttt{emitLava} (adds lava at vent locations), \texttt{computeOutflows} (computes lava distribution using minimization algorithm---most compute-intensive with $\sim$350 FLOPs/cell including \texttt{pow}, \texttt{atan}, \texttt{sqrt}), \texttt{massBalance} (gathers inflows and updates state, $\sim$36 FLOPs/cell), \texttt{reduceAdd} (parallel reduction), and \texttt{solidification} (temperature cooling, $\sim$50 FLOPs/cell).
+
+\subsection{Parallelization Rationale}
+
+Each cell is mapped to one CUDA thread. The stencil-like dependency pattern requires synchronization between phases: \texttt{computeOutflows} reads neighbor data and writes to buffer \texttt{Mf}, while \texttt{massBalance} reads from \texttt{Mf} and updates cell states.
+
+\subsection{Checksum Mismatch Explanation}
+
+The Global, Tiled, and Tiled\_Halo versions produce \textbf{identical checksums}. However, \textbf{CfAMe and CfAMo produce different checksums} due to:
+
+\begin{enumerate}
+    \item \textbf{Floating-point non-associativity}: Atomic additions execute in non-deterministic order. Since $(a + b) + c \neq a + (b + c)$ in IEEE-754, accumulated values differ by ULP-level errors.
+    \item \textbf{Different operation order}: The scatter-based atomic approach applies flows immediately rather than accumulating in a buffer first.
+\end{enumerate}
+
+These differences represent \textbf{acceptable numerical variations}, not correctness errors. The physical simulation remains valid: total emitted lava (46997.81 m) and residual lava (0.19 m) match across all versions.
+
+%==============================================================================
+\section{CUDA Implementations}
+%==============================================================================
+
+\subsection{Global Memory Version (Baseline)}
+
+Uses CUDA Unified Memory with direct global memory access. Neighborhood offsets stored in constant memory (\texttt{d\_Xi}, \texttt{d\_Xj}). Double-buffering with explicit \texttt{cudaMemcpy} between steps.
+
+\textbf{Kernels:} All kernels access global memory directly. No shared memory optimization.
+
+\subsection{Tiled Version (Shared Memory, No Halo)}
+
+Loads tile data (16$\times$16) into shared memory before computation. For boundary cells, neighbors fetched from global memory. Reduces redundant global accesses for interior cells.
+
+\textbf{Tiled kernels:} \texttt{computeOutflows}, \texttt{massBalance}, \texttt{solidification} (6.0 KB shared memory).
+
+\subsection{Tiled with Halo Version}
+
+Extends tile to 18$\times$18 (includes 1-cell halo). All neighbor accesses served from shared memory. Higher shared memory usage (7.8 KB) but eliminates global reads for stencil operations.
+
+\subsection{CfAMe (Conflict-free Atomic, Memory-Equivalent)}
+
+Fuses \texttt{computeOutflows} and \texttt{massBalance} into single kernel. Each cell computes outflows and atomically scatters to neighbors. Requires \texttt{initBuffers} and \texttt{normalizeTemperature} helper kernels.
+
+\textbf{Design:} Scatter pattern with \texttt{atomicAdd} for both lava thickness and temperature (weighted by flow).
+
+\subsection{CfAMo (Conflict-free Atomic, Memory-Optimized)}
+
+Eliminates 8-layer \texttt{Mf} buffer (saving $8 \times 195,426 \times 8 = 12.5$ MB). Flows computed and applied in single pass without intermediate storage.
+
+%==============================================================================
+\section{Performance Assessment}
+%==============================================================================
+
+\subsection{Methodology}
+
+Measurements on GTX 980 with \texttt{nvprof}. Each version runs 16,000 simulation steps. Baseline: Global version.
+
+\subsection{Execution Time Results}
 
 \begin{table}[H]
 \centering
-\caption{Execution time and speedup comparison.}
+\caption{Execution time comparison (16,000 steps).}
 \label{tab:time}
-\begin{tabular}{@{}lccccc@{}}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-\textbf{Version} & \textbf{GPU (s)} & \textbf{Total (s)} & \textbf{GPU Speedup} & \textbf{App Speedup} \\
+\textbf{Version} & \textbf{Time (s)} & \textbf{Speedup} & \textbf{Dominant Kernels (\%)} \\
 \midrule
-Global      & 2.930 & 8.367  & 1.00$\times$ & 1.00$\times$ \\
-Tiled       & 3.403 & 10.916 & 0.86$\times$ & 0.77$\times$ \\
-Tiled+Halo  & 3.212 & 9.311  & 0.91$\times$ & 0.90$\times$ \\
-CfAMe       & 1.890 & 7.628  & 1.55$\times$ & 1.10$\times$ \\
-CfAMo       & 1.845 & 7.239  & \textbf{1.59$\times$} & \textbf{1.16$\times$} \\
+Global      & 21.604 & 1.00$\times$ & massBalance 27.7, Outflows 24.0 \\
+Tiled       & 20.144 & 1.07$\times$ & massBalance 27.3, Outflows 24.9 \\
+Tiled+Halo  & 23.332 & 0.93$\times$ & Outflows 27.1, massBalance 26.0 \\
+CfAMe       & 24.689 & 0.88$\times$ & CfA\_Me 30.1, initBuffers 9.7 \\
+CfAMo       & \textbf{19.743} & \textbf{1.09$\times$} & CfA\_Mo 29.8, initBuffers 9.8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Figure: Execution time bar chart
+\subsection{CUDA Configuration}
+
+\begin{table}[H]
+\centering
+\caption{CUDA launch configuration for main kernels.}
+\label{tab:config}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Kernel} & \textbf{Grid} & \textbf{Block} & \textbf{Shared Mem} \\
+\midrule
+computeOutflows (Global) & 33$\times$24 & 16$\times$16 & 0 KB \\
+computeOutflows (Tiled) & 33$\times$24 & 16$\times$16 & 6.0 KB \\
+computeOutflows (Halo) & 33$\times$24 & 16$\times$16 & 7.8 KB \\
+CfA\_Me / CfA\_Mo & 33$\times$24 & 16$\times$16 & 0 KB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \begin{figure}[H]
 \centering
-% \includegraphics[width=0.8\textwidth]{execution_time.png}
-\fbox{\parbox{0.75\textwidth}{\centering\vspace{1.5cm}\texttt{execution\_time.png}\vspace{1.5cm}}}
-\caption{Execution time comparison (lower is better).}
+\includegraphics[width=0.85\textwidth]{histogram_times.png}
+\caption{Execution time comparison across CUDA versions.}
 \label{fig:time}
 \end{figure}
 
-Tiled versions are slower due to \texttt{\_\_syncthreads()} overhead and the small grid fitting in L2 cache (2 MB). CfAMo achieves best performance through kernel fusion and eliminating the 12.5 MB intermediate buffer.
+\subsection{Performance Analysis}
+
+\textbf{Tiled+Halo slower than Global}: Overhead of loading 324 elements for 256 threads plus multiple \texttt{\_\_syncthreads()} outweighs benefits. The small grid (195K cells $\times$ 8 bytes $\approx$ 1.5 MB per substate) fits in L2 cache (2 MB).
+
+\textbf{CfAMe slower than baseline}: Additional kernels (\texttt{initBuffers}, \texttt{normalizeTemperature}) and atomic contention overhead exceed gains from fusion.
+
+\textbf{CfAMo fastest}: Eliminates 12.5 MB buffer, reducing memory traffic. Sparse lava distribution ($<$5\% active cells) minimizes atomic contention.
 
 %==============================================================================
-\section{GPU Occupancy Analysis}
+\section{Roofline Analysis}
 %==============================================================================
 
-Table~\ref{tab:occupancy} compares occupancy metrics across versions.
+\subsection{GTX 980 Roofline Setup}
+
+Measured with \texttt{gpumembench}: Global bandwidth 224.3 GB/s, Shared bandwidth 2119.7 GB/s, Peak FP64 155.7 GFLOP/s.
+
+Ridge point (FP64): $155.7 / 224.3 = 0.694$ FLOP/Byte.
+
+\subsection{Arithmetic Intensity Calculation}
+
+For \texttt{computeOutflows}: $AI = \frac{350 \text{ FLOPs}}{9 \times 3 \times 8 + 8 \times 8 \text{ Bytes}} \approx 0.043$ FLOP/Byte.
 
 \begin{table}[H]
 \centering
-\caption{GPU occupancy and resource usage.}
-\label{tab:occupancy}
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-\textbf{Version} & \textbf{Shared Mem} & \textbf{Registers} & \textbf{Theoretical} & \textbf{Achieved} \\
-\midrule
-Global      & 0 KB   & 32 & 100\% & 58.1\% \\
-Tiled       & 6.0 KB & 38 & 100\% & 61.9\% \\
-Tiled+Halo  & 7.8 KB & 42 & 100\% & 63.6\% \\
-CfAMe       & 0 KB   & 64 & 50\%  & 18.5\% \\
-CfAMo       & 0 KB   & 64 & 50\%  & 18.5\% \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-% Figure: Occupancy comparison chart
-\begin{figure}[H]
-\centering
-% \includegraphics[width=0.8\textwidth]{occupancy_chart.png}
-\fbox{\parbox{0.75\textwidth}{\centering\vspace{1.5cm}\texttt{occupancy\_chart.png}\vspace{1.5cm}}}
-\caption{Theoretical vs achieved GPU occupancy. CfAMo has lowest occupancy but best performance.}
-\label{fig:occupancy}
-\end{figure}
-
-\textbf{Key insight}: Higher occupancy $\neq$ better performance. CfAMo has lowest occupancy (18.5\%) but fastest execution because: (1) reduced memory transactions, (2) kernel fusion eliminates barriers, (3) sparse lava minimizes atomic contention.
-
-%==============================================================================
-\section{FLOP Count Comparison}
-%==============================================================================
-
-Table~\ref{tab:flops} details FLOPs per kernel and achieved throughput.
-
-\begin{table}[H]
-\centering
-\caption{FLOP analysis per kernel and overall performance.}
-\label{tab:flops}
-\begin{tabular}{@{}lcccc@{}}
-\toprule
-\textbf{Kernel} & \textbf{FLOPs/cell} & \textbf{Type} \\
-\midrule
-computeOutflows & $\sim$350 & ADD/MUL + pow, atan, sqrt \\
-massBalance     & $\sim$36  & ADD/MUL only \\
-solidification  & $\sim$50  & ADD/MUL + exp \\
-CfA (merged)    & $\sim$386 & Combined outflow+balance \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Total FLOPs}: $195,426 \times 16,000 \times 436 = 1.36$ TFLOP
-
-\begin{table}[H]
-\centering
-\caption{Achieved FLOP/s performance.}
-\label{tab:gflops}
-\begin{tabular}{@{}lccc@{}}
-\toprule
-\textbf{Version} & \textbf{GFLOP/s} & \textbf{\% FP32 Peak} \\
-\midrule
-Global  & 464.2 & 9.3\% \\
-Tiled   & 399.6 & 8.0\% \\
-Tiled+H & 423.4 & 8.5\% \\
-CfAMe   & 719.6 & 14.4\% \\
-CfAMo   & \textbf{737.1} & \textbf{14.8\%} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-%==============================================================================
-\section{Roofline Model Analysis}
-%==============================================================================
-
-GTX 980 ridge point: $155.7 / 224.3 = 0.694$ FLOP/Byte (FP64). Table~\ref{tab:roofline} shows arithmetic intensity (AI) analysis.
-
-\begin{table}[H]
-\centering
-\caption{Roofline analysis: Arithmetic Intensity and classification.}
+\caption{Roofline analysis per version.}
 \label{tab:roofline}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
-\textbf{Version} & \textbf{AI (FLOP/B)} & \textbf{GFLOP/s} & \textbf{Bound} & \textbf{BW Util.} \\
+\textbf{Version} & \textbf{AI (FLOP/B)} & \textbf{GFLOP/s} & \textbf{Bound} \\
 \midrule
-Global      & 0.041 & 35.84 & Memory & 23.0\% \\
-Tiled       & 0.043 & 32.88 & Memory & 21.1\% \\
-Tiled+Halo  & 0.045 & 30.08 & Memory & 19.3\% \\
-CfAMe       & 0.0002 & 0.02 & Atomic & -- \\
-CfAMo       & 0.0002 & 0.02 & Atomic & -- \\
+Global      & 0.043 & 42.58 & Memory \\
+Tiled       & 0.046 & 40.55 & Memory \\
+Tiled+Halo  & 0.048 & 37.38 & Memory \\
+CfAMe       & 0.020 & 6.38 & Memory \\
+CfAMo       & 0.021 & 6.61 & Memory \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% Figure: Roofline plot
 \begin{figure}[H]
 \centering
-% \includegraphics[width=0.85\textwidth]{roofline.png}
-\fbox{\parbox{0.8\textwidth}{\centering\vspace{1.8cm}\texttt{roofline.png}\vspace{1.8cm}}}
-\caption{Roofline model for GTX 980. All versions are memory-bound (AI $<$ 0.694).}
+\includegraphics[width=0.9\textwidth]{roofline_fp64.png}
+\caption{Roofline model for GTX 980 (FP64). All versions are memory-bound (AI $\ll$ 0.694).}
 \label{fig:roofline}
 \end{figure}
 
-\textbf{Analysis}: All versions operate in memory-bound region. Global/Tiled achieve $\sim$20\% bandwidth utilization. CfA versions show low measured AI due to atomic operations, but achieve better wall-clock time through reduced memory footprint.
+\subsection{Kernel Placement Discussion}
+
+All kernels fall well below the ridge point (AI $<$ 0.05 vs 0.694), confirming \textbf{memory-bound} behavior. Low AI stems from: stencil access (9 neighbors $\times$ 3 substates), double precision (8 bytes), sparse computation. CfA versions show lower measured AI due to atomic operations introducing additional memory transactions.
+
+\subsection{GPU Occupancy}
+
+\begin{table}[H]
+\centering
+\caption{Achieved GPU occupancy.}
+\label{tab:occupancy}
+\begin{tabular}{@{}lc@{}}
+\toprule
+\textbf{Version} & \textbf{Avg. Occupancy} \\
+\midrule
+Global & 55.1\% \\
+Tiled & 58.7\% \\
+Tiled+Halo & 62.7\% \\
+CfAMe & 58.6\% \\
+CfAMo & 58.6\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Tiled+Halo has highest occupancy but lowest performance---\textbf{occupancy alone does not determine performance} for memory-bound workloads~\cite{volkov}.
 
 %==============================================================================
 \section{Conclusions}
 %==============================================================================
 
-\begin{enumerate}
-\item \textbf{Time}: CfAMo fastest (1.16$\times$ speedup) via kernel fusion
-\item \textbf{Occupancy}: Low occupancy (18.5\%) outperforms high (58-64\%) when memory-efficient
-\item \textbf{FLOPs}: Best achieved 737 GFLOP/s (14.8\% FP32 peak)
-\item \textbf{Roofline}: All memory-bound (AI $\approx$ 0.04), tiling ineffective for small grids
-\end{enumerate}
+\textbf{Key findings:} (1) All versions are memory-bound (AI $<$ 0.05), making memory efficiency critical. (2) Tiling is ineffective for this grid size due to L2 cache residency. (3) CfAMo achieves best performance (1.09$\times$) through reduced memory footprint and kernel fusion. (4) CfA versions produce numerically different but physically valid results due to floating-point non-associativity.
+
+\textbf{Bottleneck:} 34.7\% of GPU time on DtoD memory copies; bandwidth utilization 17--22\% of peak.
+
+\textbf{Future work:} Eliminate double-buffering, use texture memory for read-only substates, implement active cell list to skip empty regions.
 
 \begin{thebibliography}{4}
-\bibitem{sciara} D'Ambrosio, D., et al.: Parallel genetic algorithms for cellular automata. LNCS 7495, 444--453 (2012)
-\bibitem{roofline} Williams, S., et al.: Roofline: visual performance model. CACM 52(4), 65--76 (2009)
-\bibitem{volkov} Volkov, V.: Better performance at lower occupancy. GTC (2010)
+\bibitem{sciara} D'Ambrosio, D., et al.: Parallel genetic algorithms for optimizing cellular automata. LNCS 7495, 444--453 (2012)
+\bibitem{volkov} Volkov, V.: Better performance at lower occupancy. GPU Technology Conf. (2010)
+\bibitem{roofline} Williams, S., et al.: Roofline: An insightful visual performance model. CACM 52(4), 65--76 (2009)
 \end{thebibliography}
 
 \end{document}
