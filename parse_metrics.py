@@ -252,13 +252,18 @@ def parse_one_dataset(base):
                 pass
 
         # Apply scale factor to FLOPs (profiling may use fewer steps than benchmark)
+        # val is the Average FLOPs per invocation, so we need to multiply by invocations
         scale = PROFILING_CONFIG['scale_factor']
+        invocations = kernels[k].get('invocations', 1)
+        if invocations == 0:
+            invocations = 1
+
         if metric == 'flop_count_dp':
-            kernels[k]['total_flops'] += val * scale
+            kernels[k]['total_flops'] += val * invocations * scale
         elif metric == 'flop_count_sp':
-            kernels[k]['total_flops'] += val * scale
+            kernels[k]['total_flops'] += val * invocations * scale
         elif 'flop' in metric.lower():
-            kernels[k]['total_flops'] += val * scale
+            kernels[k]['total_flops'] += val * invocations * scale
 
     for r in mem_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))
@@ -271,8 +276,12 @@ def parse_one_dataset(base):
         trans = getval('Avg')
 
         # Apply scale factor to bytes (profiling may use fewer steps than benchmark)
+        # trans is the Average transactions per invocation, so we need to multiply by invocations
         scale = PROFILING_CONFIG['scale_factor']
-        kernels[k]['total_bytes'] += trans * TRANS_SIZE * scale
+        invocations = kernels[k].get('invocations', 1)
+        if invocations == 0:
+            invocations = 1
+        kernels[k]['total_bytes'] += trans * TRANS_SIZE * invocations * scale
 
     for r in occ_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))

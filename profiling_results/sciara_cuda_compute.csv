@@ -1,8 +1,8 @@
-==602679== NVPROF is profiling process 602679, command: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
-==602679== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
-==602679== Profiling application: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
-==602679== Profiling result:
-==602679== Metric result:
+==627579== NVPROF is profiling process 627579, command: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
+==627579== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==627579== Profiling application: ./sciara_cuda ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
+==627579== Profiling result:
+==627579== Metric result:
 "Device","Kernel","Invocations","Metric Name","Metric Description","Min","Max","Avg"
 "NVIDIA GeForce GTX 980 (0)","kernel_computeOutflows(int, int, double*, double*, double*, double*, double, double, double, double, double)",1000,"flop_count_dp","Floating Point Operations(Double Precision)",1314,1608528,864665
 "NVIDIA GeForce GTX 980 (0)","kernel_computeOutflows(int, int, double*, double*, double*, double*, double, double, double, double, double)",1000,"flop_count_sp","Floating Point Operations(Single Precision)",48,55384,29753

@@ -1,11 +1,11 @@
 92524f6861e44387f35bfbc1b8d0fbe1  ./data/2006/output_2006_000000016000_Temperature.asc
 0d6323704a34153b9aa47aab92062931  ./data/2006/output_2006_000000016000_EmissionRate.txt
-b6179c6b4c50c07028d8be0824ee6520  ./data/2006/output_2006_000000016000_SolidifiedLavaThickness.asc
-fe89c76e741a421c427f88bf6c434c97  ./data/2006/output_2006_000000016000_Morphology.asc
+40f18112bbce58dfeb11137bbf17c8be  ./data/2006/output_2006_000000016000_SolidifiedLavaThickness.asc
+85b88ef0386c824098f2bcd9b9794436  ./data/2006/output_2006_000000016000_Morphology.asc
 6faf3b9a060380ff917cd92eaf0db9f5  ./data/2006/output_2006_000000016000_Vents.asc
 c39e347f028a55624a965512c2c7b314  ./data/2006/output_2006_000000016000_Thickness.asc
 Step 16000
-Elapsed time [s]: 25.467000
+Elapsed time [s]: 24.689000
 Emitted lava [m]: 46997.805865
 Current lava [m]: 0.192560
 Saving output to ./data/2006/output_2006...

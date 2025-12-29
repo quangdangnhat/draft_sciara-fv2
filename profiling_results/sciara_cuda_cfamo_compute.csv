@@ -1,10 +1,10 @@
-==607658== NVPROF is profiling process 607658, command: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
-==607658== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
-==607658== Profiling application: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
-==607658== Profiling result:
-==607658== Metric result:
+==640264== NVPROF is profiling process 640264, command: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
+==640264== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==640264== Profiling application: ./sciara_cuda_cfamo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 1000 100 1.0
+==640264== Profiling result:
+==640264== Metric result:
 "Device","Kernel","Invocations","Metric Name","Metric Description","Min","Max","Avg"
-"NVIDIA GeForce GTX 980 (0)","kernel_CfA_Mo(int, int, double*, double*, double*, double*, double*, double, double, double, double, double)",1000,"flop_count_dp","Floating Point Operations(Double Precision)",1370,1660675,892678
+"NVIDIA GeForce GTX 980 (0)","kernel_CfA_Mo(int, int, double*, double*, double*, double*, double*, double, double, double, double, double)",1000,"flop_count_dp","Floating Point Operations(Double Precision)",1370,1660683,892678
 "NVIDIA GeForce GTX 980 (0)","kernel_CfA_Mo(int, int, double*, double*, double*, double*, double*, double, double, double, double, double)",1000,"flop_count_sp","Floating Point Operations(Single Precision)",52,60534,32525
 "NVIDIA GeForce GTX 980 (0)","kernel_normalizeTemperature(int, int, double*, double*)",1000,"flop_count_dp","Floating Point Operations(Double Precision)",55,28325,15274
 "NVIDIA GeForce GTX 980 (0)","kernel_normalizeTemperature(int, int, double*, double*)",1000,"flop_count_sp","Floating Point Operations(Single Precision)",10,5150,2777

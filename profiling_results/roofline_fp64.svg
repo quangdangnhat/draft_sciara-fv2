@@ -496,6 +496,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt6' transform='translate(652.78,212.10) scale(5.40)' color='rgb(139,   0,   0)'/>
 	<use xlink:href='#gpPt6' transform='translate(1136.76,652.40) scale(5.40)' color='rgb(139,   0,   0)'/>
 </g>
 	</g>
@@ -506,6 +507,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt8' transform='translate(581.34,375.59) scale(5.40)' color='rgb(255,  99,  71)'/>
 	<use xlink:href='#gpPt8' transform='translate(1136.76,670.40) scale(5.40)' color='rgb(255,  99,  71)'/>
 </g>
 	</g>
@@ -516,6 +518,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt12' transform='translate(584.43,372.49) scale(5.40)' color='rgb( 65, 105, 225)'/>
 	<use xlink:href='#gpPt12' transform='translate(1136.76,688.40) scale(5.40)' color='rgb( 65, 105, 225)'/>
 </g>
 	</g>
@@ -526,6 +529,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt4' transform='translate(659.90,216.30) scale(5.40)' color='rgb( 50, 205,  50)'/>
 	<use xlink:href='#gpPt4' transform='translate(1136.76,706.40) scale(5.40)' color='rgb( 50, 205,  50)'/>
 </g>
 	</g>
@@ -536,11 +540,27 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt10' transform='translate(664.60,223.31) scale(5.40)' color='rgb(255, 215,   0)'/>
 	<use xlink:href='#gpPt10' transform='translate(1136.76,724.40) scale(5.40)' color='rgb(255, 215,   0)'/>
 </g>
 	</g>
 	<g id="gnuplot_plot_9" ><title>gnuplot_plot_9</title>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<g transform="translate(664.60,211.84)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Tiled</tspan><tspan font-family="Arial"  font-size="7.2" dy="2.70px">H</tspan><tspan font-family="Arial"  font-size="9.0" dy="-2.70px">alo</tspan></text>
+	</g>
+	<g transform="translate(581.34,364.12)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Cfame</tspan></text>
+	</g>
+	<g transform="translate(659.90,204.83)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Tiled</tspan></text>
+	</g>
+	<g transform="translate(584.43,361.02)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Cfamo</tspan></text>
+	</g>
+	<g transform="translate(652.78,200.63)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Global</tspan></text>
+	</g>
 </g>
 	</g>
 <g fill="none" color="white" stroke="black" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">

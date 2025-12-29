@@ -5,7 +5,7 @@
 6faf3b9a060380ff917cd92eaf0db9f5  ./data/2006/output_2006_000000016000_Vents.asc
 c39e347f028a55624a965512c2c7b314  ./data/2006/output_2006_000000016000_Thickness.asc
 Step 16000
-Elapsed time [s]: 26.975000
+Elapsed time [s]: 21.604000
 Emitted lava [m]: 46997.805865
 Current lava [m]: 0.192560
 Saving output to ./data/2006/output_2006...
