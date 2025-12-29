@@ -2,7 +2,13 @@
 % Chi tiết hướng dẫn cho người mới bắt đầu
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[utf8]{inputenc}
+% === VIETNAMESE SUPPORT (use XeLaTeX compiler in Overleaf) ===
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{vietnamese}
+\setotherlanguage{english}
+\setmainfont{Times New Roman}  % or any font with Vietnamese support
+
 \usepackage[margin=2cm]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
