@@ -7,7 +7,7 @@
 >
 
 <title>Gnuplot</title>
-<desc>Produced by GNUPLOT 5.4 patchlevel 1 </desc>
+<desc>Produced by GNUPLOT 6.0 patchlevel 0 </desc>
 
 <g id="gnuplot_canvas">
 
@@ -398,13 +398,13 @@
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<path stroke='black'  d='M72.53,60.01 L72.53,742.40 L1174.82,742.40 L1174.82,60.01 L72.53,60.01 Z  '/>	<g transform="translate(494.83,471.81) rotate(-45)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
+	<path stroke='black'  d='M72.53,60.01 L72.53,742.40 L1174.82,742.40 L1174.82,60.01 L72.53,60.01 Z  '/>	<g transform="translate(494.83,471.81) rotate(-45.00)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
 		<text><tspan font-family="Arial" >DRAM: 224 GB/s</tspan></text>
 	</g>
-	<g transform="translate(285.65,244.30) rotate(-45)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
+	<g transform="translate(285.65,244.30) rotate(-45.00)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
 		<text><tspan font-family="Arial" >L1/Tex: 28009 GB/s</tspan></text>
 	</g>
-	<g transform="translate(400.92,362.88) rotate(-45)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
+	<g transform="translate(400.92,362.88) rotate(-45.00)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
 		<text><tspan font-family="Arial" >Shared: 2120 GB/s</tspan></text>
 	</g>
 	<g transform="translate(954.36,96.17)" stroke="none" fill="rgb(0,0,0)" font-family="Arial" font-size="12.00"  text-anchor="start">
@@ -412,19 +412,9 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<g transform="translate(19.18,401.21) rotate(270)" stroke="none" fill="black" font-family="Arial" font-size="12.00"  text-anchor="middle">
-		<text><tspan font-family="Arial" >Performance (GFLOP/s)</tspan></text>
-	</g>
-</g>
-<g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<g transform="translate(623.67,791.30)" stroke="none" fill="black" font-family="Arial" font-size="12.00"  text-anchor="middle">
-		<text><tspan font-family="Arial" >Arithmetic Intensity (FLOP/Byte)</tspan></text>
-	</g>
-</g>
-<g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
 </g>
 	<g id="gnuplot_plot_1" ><title>DRAM Roofline</title>
-<g fill="none" color="white" stroke="currentColor" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">
+<g fill="none" color="white" stroke="black" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">
 	<g transform="translate(1107.09,602.30)" stroke="none" fill="black" font-family="Arial" font-size="12.00"  text-anchor="end">
@@ -496,6 +486,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt6' transform='translate(652.78,214.12) scale(5.40)' color='rgb(139,   0,   0)'/>
 	<use xlink:href='#gpPt6' transform='translate(1136.76,652.40) scale(5.40)' color='rgb(139,   0,   0)'/>
 </g>
 	</g>
@@ -506,6 +497,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt8' transform='translate(581.34,377.60) scale(5.40)' color='rgb(255,  99,  71)'/>
 	<use xlink:href='#gpPt8' transform='translate(1136.76,670.40) scale(5.40)' color='rgb(255,  99,  71)'/>
 </g>
 	</g>
@@ -516,6 +508,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt12' transform='translate(584.42,372.04) scale(5.40)' color='rgb( 65, 105, 225)'/>
 	<use xlink:href='#gpPt12' transform='translate(1136.76,688.40) scale(5.40)' color='rgb( 65, 105, 225)'/>
 </g>
 	</g>
@@ -526,6 +519,7 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt4' transform='translate(659.89,216.11) scale(5.40)' color='rgb( 50, 205,  50)'/>
 	<use xlink:href='#gpPt4' transform='translate(1136.76,706.40) scale(5.40)' color='rgb( 50, 205,  50)'/>
 </g>
 	</g>
@@ -536,11 +530,27 @@
 	</g>
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<use xlink:href='#gpPt10' transform='translate(664.60,222.84) scale(5.40)' color='rgb(255, 215,   0)'/>
 	<use xlink:href='#gpPt10' transform='translate(1136.76,724.40) scale(5.40)' color='rgb(255, 215,   0)'/>
 </g>
 	</g>
-	<g id="gnuplot_plot_9" ><title>gnuplot_plot_9</title>
+	<g id="gnuplot_plot_9"  fill="none"><title>gnuplot_plot_9</title>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<g transform="translate(652.78,202.65)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Global</tspan></text>
+	</g>
+	<g transform="translate(581.34,366.13)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Cfame</tspan></text>
+	</g>
+	<g transform="translate(584.42,360.57)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Cfamo</tspan></text>
+	</g>
+	<g transform="translate(664.60,211.37)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Tiled</tspan><tspan font-family="Arial"  font-size="7.2" dy="2.70px">H</tspan><tspan font-family="Arial"  font-size="9.0" dy="-2.70px">alo</tspan></text>
+	</g>
+	<g transform="translate(659.89,204.64)" stroke="none" fill="black" font-family="Arial" font-size="9.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Tiled</tspan></text>
+	</g>
 </g>
 	</g>
 <g fill="none" color="white" stroke="black" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">
@@ -550,7 +560,17 @@
 <g fill="none" color="black" stroke="black" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
 </g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
-	<path stroke='black'  d='M72.53,60.01 L72.53,742.40 L1174.82,742.40 L1174.82,60.01 L72.53,60.01 Z  '/></g>
+	<path stroke='black'  d='M72.53,60.01 L72.53,742.40 L1174.82,742.40 L1174.82,60.01 L72.53,60.01 Z  '/>	<g transform="translate(19.18,401.21) rotate(270.00)" stroke="none" fill="black" font-family="Arial" font-size="12.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Performance (GFLOP/s)</tspan></text>
+	</g>
+</g>
+<g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+	<g transform="translate(623.67,791.30)" stroke="none" fill="black" font-family="Arial" font-size="12.00"  text-anchor="middle">
+		<text><tspan font-family="Arial" >Arithmetic Intensity (FLOP/Byte)</tspan></text>
+	</g>
+</g>
+<g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
+</g>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
 	<g transform="translate(623.67,32.21)" stroke="none" fill="black" font-family="Arial" font-size="16.00"  text-anchor="middle">
 		<text><tspan font-family="Arial" >Roofline Model (FP64)</tspan></text>
