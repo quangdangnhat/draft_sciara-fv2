@@ -11,6 +11,7 @@ TIME_DAT = os.path.join(RESULTS_DIR, "time_data.dat")
 OCC_DAT = os.path.join(RESULTS_DIR, "occupancy_data.dat")
 BENCH_FILE = os.path.join(RESULTS_DIR, "gpumembench.log")
 SPECS_FILE = os.path.join(RESULTS_DIR, "roofline_specs.gp")
+CONFIG_FILE = os.path.join(RESULTS_DIR, "profiling_config.txt")
 
 # Default GPU specs (can be overridden by gpumembench log)
 SPECS = {
@@ -19,6 +20,40 @@ SPECS = {
     'bw_shared': 2119.7,
     'peak_flops': 155.7
 }
+
+# Profiling config (scale factor for FLOPs/bytes when PROFILING_STEPS != STEPS)
+PROFILING_CONFIG = {
+    'steps': 16000,
+    'profiling_steps': 16000,
+    'scale_factor': 1.0
+}
+
+def parse_profiling_config():
+    """Parse profiling_config.txt to get scale factor for FLOPs/bytes"""
+    if not os.path.exists(CONFIG_FILE):
+        print(f"Warning: {CONFIG_FILE} not found. Using scale_factor=1.0")
+        return
+
+    with open(CONFIG_FILE, 'r') as f:
+        for line in f:
+            if '=' in line:
+                key, val = line.strip().split('=', 1)
+                key = key.strip().upper()
+                try:
+                    if key == 'STEPS':
+                        PROFILING_CONFIG['steps'] = int(val)
+                    elif key == 'PROFILING_STEPS':
+                        PROFILING_CONFIG['profiling_steps'] = int(val)
+                    elif key == 'SCALE_FACTOR':
+                        PROFILING_CONFIG['scale_factor'] = float(val)
+                except:
+                    pass
+
+    # Calculate scale factor if not explicitly set
+    if PROFILING_CONFIG['profiling_steps'] > 0:
+        PROFILING_CONFIG['scale_factor'] = PROFILING_CONFIG['steps'] / PROFILING_CONFIG['profiling_steps']
+
+    print(f"Profiling Config: STEPS={PROFILING_CONFIG['steps']}, PROFILING_STEPS={PROFILING_CONFIG['profiling_steps']}, scale_factor={PROFILING_CONFIG['scale_factor']:.2f}x")
 
 def parse_gpumembench():
     """Parses gpumembench.log for empirical bandwidths"""
@@ -216,12 +251,14 @@ def parse_one_dataset(base):
             except:
                 pass
 
+        # Apply scale factor to FLOPs (profiling may use fewer steps than benchmark)
+        scale = PROFILING_CONFIG['scale_factor']
         if metric == 'flop_count_dp':
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
         elif metric == 'flop_count_sp':
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
         elif 'flop' in metric.lower():
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
 
     for r in mem_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))
@@ -230,10 +267,12 @@ def parse_one_dataset(base):
 
         def getval(f):
             return float(re.sub(r'[^0-9\.]', '', str(r.get(f, 0))))
-            
+
         trans = getval('Avg')
-        
-        kernels[k]['total_bytes'] += trans * TRANS_SIZE
+
+        # Apply scale factor to bytes (profiling may use fewer steps than benchmark)
+        scale = PROFILING_CONFIG['scale_factor']
+        kernels[k]['total_bytes'] += trans * TRANS_SIZE * scale
 
     for r in occ_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))
@@ -277,6 +316,8 @@ def calc_roofline_point(total_flops, total_bytes, time_s, version_name, kernel_n
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
+    # Parse profiling config first to get scale factor
+    parse_profiling_config()
     parse_gpumembench()
 
     # Write specs file for gnuplot

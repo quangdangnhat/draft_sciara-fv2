@@ -3,15 +3,26 @@
 # Configuration
 INPUT_CONFIG="./data/2006/2006_000000000000.cfg"
 OUTPUT_CONFIG="./data/2006/output_2006"
-# Use same STEPS for all metrics to ensure consistency
+
+# STEPS: Used for execution time measurement (must match project requirement: 16000)
+# PROFILING_STEPS: Used for metric collection (smaller = faster profiling)
+# Metrics will be scaled by (STEPS/PROFILING_STEPS) ratio in parse_metrics.py
 STEPS=16000
-PROFILING_STEPS=16000        # Same as STEPS for consistent FLOP/memory measurements
-PROFILING_STEPS_INTERVAL=1000
+PROFILING_STEPS=1000         # Use 1000 steps for faster metric collection (~16x faster)
+PROFILING_STEPS_INTERVAL=100
 REDUCE_INTERVAL=1000
 THICKNESS_THRESHOLD=1.0
 
 OUTPUT_PROFILE="./profiling_results"
 mkdir -p "$OUTPUT_PROFILE"
+
+# Write profiling config for parse_metrics.py to use for scaling
+cat > "$OUTPUT_PROFILE/profiling_config.txt" << EOF
+STEPS=$STEPS
+PROFILING_STEPS=$PROFILING_STEPS
+SCALE_FACTOR=$(echo "scale=6; $STEPS / $PROFILING_STEPS" | bc)
+EOF
+echo "Profiling config: STEPS=$STEPS, PROFILING_STEPS=$PROFILING_STEPS (scale factor: $((STEPS / PROFILING_STEPS))x)"
 
 # Find executables
 EXECUTABLES=$(find . -maxdepth 1 -type f -name "*cuda*" ! -name "*.*" -executable)
@@ -61,8 +72,8 @@ for exe in $EXECUTABLES; do
         ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $STEPS $REDUCE_INTERVAL $THICKNESS_THRESHOLD > "${OUTPUT_PROFILE}/${exe_name}.log" 2>&1
 
     # 2. Compute Metrics (FP64, FP32, FP16 FLOP counts)
-    # IMPORTANT: Use same STEPS as execution time measurement for consistent GFLOPS calculation
-    echo "[2/4] Collecting Compute Metrics (FLOP counts)..."
+    # Uses PROFILING_STEPS (smaller) for faster collection; parse_metrics.py will scale results
+    echo "[2/4] Collecting Compute Metrics (FLOP counts) [${PROFILING_STEPS} steps]..."
     nvprof --metrics flop_count_dp,flop_count_sp,flop_count_hp --log-file "${OUTPUT_PROFILE}/${exe_name}_compute.csv" --csv \
         ./$exe_name $INPUT_CONFIG $OUTPUT_CONFIG $PROFILING_STEPS $PROFILING_STEPS_INTERVAL $THICKNESS_THRESHOLD > /dev/null 2>&1
 
