@@ -1,18 +1,18 @@
-==560453== NVPROF is profiling process 560453, command: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
-==560453== Profiling application: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
-==560453== Profiling result:
+==619626== NVPROF is profiling process 619626, command: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==619626== Profiling application: ./sciara_cuda_tiled_halo ./data/2006/2006_000000000000.cfg ./data/2006/output_2006 16000 1000 1.0
+==619626== Profiling result:
 "Type","Time(%)","Time","Calls","Avg","Min","Max","Name"
 ,%,s,,us,us,us,
-"GPU activities",31.026645,2.604284,112000,23.252000,17.248000,36.448000,"[CUDA memcpy DtoD]"
-"GPU activities",27.063054,2.271592,16000,141.974000,66.432000,220.578000,"kernel_computeOutflows_halo(int, int, double*, double*, double*, double*, double, double, double, double, double)"
-"GPU activities",25.964564,2.179388,16000,136.211000,132.705000,367.971000,"kernel_massBalance_halo(int, int, double*, double*, double*, double*, double*)"
-"GPU activities",13.076954,1.097640,16000,68.602000,46.977000,103.041000,"kernel_computeNewTemperatureAndSolidification_halo(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)"
-"GPU activities",2.861796,0.240211,16000,15.013000,14.464000,18.977000,"kernel_emitLava_halo(int, int, int*, int*, double*, int, double, double*, double*, double*)"
-"GPU activities",0.005059,0.000425,32,13.269000,4.480000,22.465000,"kernel_reduceAdd(double*, double*, int)"
-"GPU activities",0.001894,0.000159,9,17.664000,4.512000,72.928000,"[CUDA memset]"
-"GPU activities",0.000034,0.000003,2,1.440000,1.280000,1.600000,"[CUDA memcpy HtoD]"
+"GPU activities",31.108567,2.613709,112000,23.336000,17.088000,30.816000,"[CUDA memcpy DtoD]"
+"GPU activities",27.042725,2.272101,16000,142.006000,66.464000,220.801000,"kernel_computeOutflows_halo(int, int, double*, double*, double*, double*, double, double, double, double, double)"
+"GPU activities",25.933064,2.178869,16000,136.179000,132.640000,148.769000,"kernel_massBalance_halo(int, int, double*, double*, double*, double*, double*)"
+"GPU activities",13.050432,1.096484,16000,68.530000,46.784000,106.464000,"kernel_computeNewTemperatureAndSolidification_halo(int, int, double, double, double, double, double, double, double, double, double*, double*, double*, double*, double*, double*, double*, bool*)"
+"GPU activities",2.858203,0.240143,16000,15.008000,14.464000,16.384000,"kernel_emitLava_halo(int, int, int*, int*, double*, int, double, double*, double*, double*)"
+"GPU activities",0.005070,0.000426,32,13.311000,4.480000,22.720000,"kernel_reduceAdd(double*, double*, int)"
+"GPU activities",0.001904,0.000160,9,17.774000,4.544000,73.056000,"[CUDA memset]"
+"GPU activities",0.000035,0.000003,2,1.456000,1.312000,1.600000,"[CUDA memcpy HtoD]"
 
-==560453== Unified Memory profiling result:
+==619626== Unified Memory profiling result:
 "Device","Count","Avg Size","Min Size","Max Size","Total Size","Total Time",""
 "NVIDIA GeForce GTX 980 (0)",16004,4.202148KB,4.000000KB,1.125000MB,65.679688MB,0.000000,"Host To Device"
 "NVIDIA GeForce GTX 980 (0)",48121,21.474609KB,4.000000KB,508.000000KB,0.985550GB,0.000000,"Device To Host"

@@ -7,6 +7,9 @@ set boxwidth 0.6
 set yrange [0:*]
 set style line 1 lc rgb '#4F9FE0'
 
+# Function to convert underscores to spaces for display
+# Note: Version names use underscores in data file (e.g., "Tiled_Halo")
+
 # PNG output
 set terminal png size 800,600 enhanced font 'Arial,12'
 set output './profiling_results/histogram_times.png'

@@ -11,6 +11,7 @@ TIME_DAT = os.path.join(RESULTS_DIR, "time_data.dat")
 OCC_DAT = os.path.join(RESULTS_DIR, "occupancy_data.dat")
 BENCH_FILE = os.path.join(RESULTS_DIR, "gpumembench.log")
 SPECS_FILE = os.path.join(RESULTS_DIR, "roofline_specs.gp")
+CONFIG_FILE = os.path.join(RESULTS_DIR, "profiling_config.txt")
 
 # Default GPU specs (can be overridden by gpumembench log)
 SPECS = {
@@ -19,6 +20,40 @@ SPECS = {
     'bw_shared': 2119.7,
     'peak_flops': 155.7
 }
+
+# Profiling config (scale factor for FLOPs/bytes when PROFILING_STEPS != STEPS)
+PROFILING_CONFIG = {
+    'steps': 16000,
+    'profiling_steps': 16000,
+    'scale_factor': 1.0
+}
+
+def parse_profiling_config():
+    """Parse profiling_config.txt to get scale factor for FLOPs/bytes"""
+    if not os.path.exists(CONFIG_FILE):
+        print(f"Warning: {CONFIG_FILE} not found. Using scale_factor=1.0")
+        return
+
+    with open(CONFIG_FILE, 'r') as f:
+        for line in f:
+            if '=' in line:
+                key, val = line.strip().split('=', 1)
+                key = key.strip().upper()
+                try:
+                    if key == 'STEPS':
+                        PROFILING_CONFIG['steps'] = int(val)
+                    elif key == 'PROFILING_STEPS':
+                        PROFILING_CONFIG['profiling_steps'] = int(val)
+                    elif key == 'SCALE_FACTOR':
+                        PROFILING_CONFIG['scale_factor'] = float(val)
+                except:
+                    pass
+
+    # Calculate scale factor if not explicitly set
+    if PROFILING_CONFIG['profiling_steps'] > 0:
+        PROFILING_CONFIG['scale_factor'] = PROFILING_CONFIG['steps'] / PROFILING_CONFIG['profiling_steps']
+
+    print(f"Profiling Config: STEPS={PROFILING_CONFIG['steps']}, PROFILING_STEPS={PROFILING_CONFIG['profiling_steps']}, scale_factor={PROFILING_CONFIG['scale_factor']:.2f}x")
 
 def parse_gpumembench():
     """Parses gpumembench.log for empirical bandwidths"""
@@ -131,11 +166,17 @@ def clean_version(base_name):
     return s
 
 def match_kernel_name(name):
+    """Match kernel name to a canonical name for grouping"""
     if not name: return None
+    # Standard kernels
     if 'computeOutflows' in name: return 'computeOutflows'
     if 'massBalance' in name: return 'massBalance'
+    # CfA combined kernels (these combine outflows + massBalance)
     if 'CfA_Me' in name: return 'CfA_Me'
     if 'CfA_Mo' in name: return 'CfA_Mo'
+    # Additional kernels that contribute to computation
+    if 'initBuffers' in name: return 'initBuffers'
+    if 'normalizeTemperature' in name: return 'normalizeTemperature'
     return None
 
 def parse_one_dataset(base):
@@ -210,12 +251,14 @@ def parse_one_dataset(base):
             except:
                 pass
 
+        # Apply scale factor to FLOPs (profiling may use fewer steps than benchmark)
+        scale = PROFILING_CONFIG['scale_factor']
         if metric == 'flop_count_dp':
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
         elif metric == 'flop_count_sp':
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
         elif 'flop' in metric.lower():
-            kernels[k]['total_flops'] += val
+            kernels[k]['total_flops'] += val * scale
 
     for r in mem_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))
@@ -224,10 +267,12 @@ def parse_one_dataset(base):
 
         def getval(f):
             return float(re.sub(r'[^0-9\.]', '', str(r.get(f, 0))))
-            
+
         trans = getval('Avg')
-        
-        kernels[k]['total_bytes'] += trans * TRANS_SIZE
+
+        # Apply scale factor to bytes (profiling may use fewer steps than benchmark)
+        scale = PROFILING_CONFIG['scale_factor']
+        kernels[k]['total_bytes'] += trans * TRANS_SIZE * scale
 
     for r in occ_rows:
         k = match_kernel_name(r.get('Kernel', r.get('Name', '')))
@@ -245,31 +290,34 @@ def parse_one_dataset(base):
 
 def calc_roofline_point(total_flops, total_bytes, time_s, version_name, kernel_name=""):
     """
-    Calcola un punto per il roofline plot.
-    Returns: (gflops, ai_dram, ai_l1, ai_shared) o None se i dati non sono validi
+    Calculate a point for the roofline plot.
+    Returns: (gflops, ai) or None if data is invalid
     """
     if time_s <= 0 or total_flops <= 0:
         print(f"  Warning [{version_name}{' - ' + kernel_name if kernel_name else ''}]: Invalid data (time={time_s:.6f}s, flops={total_flops:.2e})")
         return None
-    
-    # GFLOPS = FLOP totali / tempo totale / 1e5
-    gflops = (total_flops / time_s) / 1e5
-    
+
+    # GFLOPS = FLOP total / time total / 1e9 (NOT 1e5!)
+    # 1 GFLOPS = 10^9 FLOPS
+    gflops = (total_flops / time_s) / 1e9
+
     # Arithmetic Intensity = FLOP / Byte
     ai = total_flops / max(1.0, total_bytes)
-    
+
     # Debug output
     print(f"  [{version_name}{' - ' + kernel_name if kernel_name else ''}]:")
     print(f"    FLOP total: {total_flops:.2e}")
     print(f"    Time: {time_s:.6f} s")
     print(f"    GFLOPS: {gflops:.4f}")
-    print(f"    Total bytes: {total_bytes:.2e} -> AI: {ai:.4f} FLOP/byte")
-    
+    print(f"    Total bytes: {total_bytes:.2e} -> AI: {ai:.6f} FLOP/byte")
+
     return gflops, ai
 
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
+    # Parse profiling config first to get scale factor
+    parse_profiling_config()
     parse_gpumembench()
 
     # Write specs file for gnuplot
@@ -304,38 +352,75 @@ def main():
             total_time = sum(k['time_total_s'] for k in kernels.values())
             time_map[version] = total_time
 
-        # Occupancy: media di tutti i kernel principali
+        # Occupancy: average of all main kernels
         occ_vals = []
-        for k_name in ('massBalance', 'computeOutflows', 'CfA_Me', 'CfA_Mo'):
+        for k_name in ('massBalance', 'computeOutflows', 'CfA_Me', 'CfA_Mo', 'initBuffers', 'normalizeTemperature'):
             if k_name in kernels and kernels[k_name]['occupancies']:
                 occ_vals.append(statistics.mean(kernels[k_name]['occupancies']))
         occ_map[version] = statistics.mean(occ_vals) if occ_vals else 0.0
 
-        # Roofline: combina massBalance + computeOutflows, oppure usa singolo kernel CfA
-        k1 = kernels.get('massBalance')
-        k2 = kernels.get('computeOutflows')
-        
+        # Roofline calculation: combine relevant kernels based on version type
+        k_mass = kernels.get('massBalance')
+        k_outflows = kernels.get('computeOutflows')
+        k_cfame = kernels.get('CfA_Me')
+        k_cfamo = kernels.get('CfA_Mo')
+        k_init = kernels.get('initBuffers')
+        k_norm = kernels.get('normalizeTemperature')
+
         roofline_point = None
-        
-        if k1 and k2 and (k1['total_flops'] > 0 or k2['total_flops'] > 0):
-            combined_flops = k1['total_flops'] + k2['total_flops']
-            combined_total_bytes = k1['total_bytes'] + k2['total_bytes']
-            combined_time = k1['time_total_s'] + k2['time_total_s']
-            
+
+        # For standard Global/Tiled versions: combine massBalance + computeOutflows
+        if k_mass and k_outflows and (k_mass['total_flops'] > 0 or k_outflows['total_flops'] > 0):
+            combined_flops = k_mass['total_flops'] + k_outflows['total_flops']
+            combined_total_bytes = k_mass['total_bytes'] + k_outflows['total_bytes']
+            combined_time = k_mass['time_total_s'] + k_outflows['time_total_s']
+
             roofline_point = calc_roofline_point(
-                combined_flops, combined_total_bytes, 
+                combined_flops, combined_total_bytes,
                 combined_time, version, "massBalance + computeOutflows"
             )
-        else:
-            # Prova con singolo kernel CfA
-            for k_name in ['CfA_Me', 'CfA_Mo']:
-                k = kernels.get(k_name)
-                if k and k['total_flops'] > 0:
-                    roofline_point = calc_roofline_point(
-                        k['total_flops'], k['total_bytes'], 
-                        k['time_total_s'], version, k_name
-                    )
-                    break
+        # For CfAMe version: use CfA_Me kernel + helper kernels
+        elif k_cfame:
+            combined_flops = k_cfame['total_flops']
+            combined_total_bytes = k_cfame['total_bytes']
+            combined_time = k_cfame['time_total_s']
+
+            # Add initBuffers and normalizeTemperature if present
+            if k_init:
+                combined_flops += k_init['total_flops']
+                combined_total_bytes += k_init['total_bytes']
+                combined_time += k_init['time_total_s']
+            if k_norm:
+                combined_flops += k_norm['total_flops']
+                combined_total_bytes += k_norm['total_bytes']
+                combined_time += k_norm['time_total_s']
+
+            if combined_flops > 0:
+                roofline_point = calc_roofline_point(
+                    combined_flops, combined_total_bytes,
+                    combined_time, version, "CfA_Me + helpers"
+                )
+        # For CfAMo version: use CfA_Mo kernel + helper kernels
+        elif k_cfamo:
+            combined_flops = k_cfamo['total_flops']
+            combined_total_bytes = k_cfamo['total_bytes']
+            combined_time = k_cfamo['time_total_s']
+
+            # Add initBuffers and normalizeTemperature if present
+            if k_init:
+                combined_flops += k_init['total_flops']
+                combined_total_bytes += k_init['total_bytes']
+                combined_time += k_init['time_total_s']
+            if k_norm:
+                combined_flops += k_norm['total_flops']
+                combined_total_bytes += k_norm['total_bytes']
+                combined_time += k_norm['time_total_s']
+
+            if combined_flops > 0:
+                roofline_point = calc_roofline_point(
+                    combined_flops, combined_total_bytes,
+                    combined_time, version, "CfA_Mo + helpers"
+                )
         
         if roofline_point:
             gflops, ai = roofline_point
@@ -349,20 +434,28 @@ def main():
             print(f"  Warning: No valid roofline data for {version}")
 
     # Write output files
+    # Note: Use underscores instead of spaces for version names to avoid gnuplot parsing issues
     with open(ROOFLINE_DAT, 'w') as f:
         f.write('# Label AI GFLOPS Version\n')
         for r in roofline_rows:
-            f.write(f'"{r["label"]}" {r["ai"]:.6f} {r["gflops"]:.4f} "{r["version"]}"\n')
+            # Replace spaces with underscores for gnuplot compatibility
+            label_safe = r["label"].replace(" ", "_")
+            version_safe = r["version"].replace(" ", "_")
+            f.write(f'{label_safe} {r["ai"]:.6f} {r["gflops"]:.4f} {version_safe}\n')
 
     with open(TIME_DAT, 'w') as f:
         f.write('# Version Time_s\n')
         for v, t in sorted(time_map.items(), key=lambda x: x[1], reverse=True):
-            f.write(f'"{v}" {t:.6f}\n')
+            # Replace spaces with underscores for gnuplot compatibility
+            v_safe = v.replace(" ", "_")
+            f.write(f'{v_safe} {t:.6f}\n')
 
     with open(OCC_DAT, 'w') as f:
         f.write('# Version Occupancy(0-1)\n')
         for v, o in sorted(occ_map.items(), key=lambda x: x[0]):
-            f.write(f'"{v}" {o:.6f}\n')
+            # Replace spaces with underscores for gnuplot compatibility
+            v_safe = v.replace(" ", "_")
+            f.write(f'{v_safe} {o:.6f}\n')
 
     print(f'\n=== Output files written ===')
     print(f'Roofline data: {ROOFLINE_DAT}')
