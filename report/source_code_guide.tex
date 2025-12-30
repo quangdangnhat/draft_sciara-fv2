@@ -86,7 +86,6 @@ draft_sciara-fv2/
 ├── sciara_fv2_cfame.cu   <- [GPU] Version 4: Atomic (giữ buffer Mf)
 ├── sciara_fv2_cfamo.cu   <- [GPU] Version 5: Atomic (bỏ Mf) - NHANH NHẤT
 │
-├── block_size_exploration.cu <- Tool benchmark kích thước block
 ├── io.cpp, vent.cpp, ... <- Các file hỗ trợ I/O
 └── data/                 <- Dữ liệu Mt. Etna 2006
 \end{verbatim}
@@ -118,9 +117,6 @@ draft_sciara-fv2/
 \node[box, fill=cyan!50, below=of tiled] (halo) {sciara\_fv2\_tiled\_halo.cu\\(+ Halo Region)};
 \node[box, fill=red!40, below=of cfame] (cfamo) {sciara\_fv2\_cfamo.cu\\(Bỏ buffer Mf)\\NHANH NHẤT};
 
-% Standalone
-\node[box, fill=purple!20, right=2cm of global] (explore) {block\_size\_exploration.cu\\(Benchmark tool)};
-
 % Arrows
 \draw[arrow] (cpp) -- (cu) node[midway, left, font=\scriptsize] {malloc→cudaMallocManaged};
 \draw[arrow] (serial) -- (global) node[midway, right, font=\scriptsize] {Thêm CUDA kernels};
@@ -129,7 +125,6 @@ draft_sciara-fv2/
 \draw[arrow] (global) -- (cfame) node[midway, right, font=\scriptsize] {merge kernels};
 \draw[arrow] (tiled) -- (halo) node[midway, left, font=\scriptsize] {+halo};
 \draw[arrow] (cfame) -- (cfamo) node[midway, right, font=\scriptsize] {bỏ Mf};
-\draw[arrow, dashed] (global) -- (explore);
 
 \end{tikzpicture}
 \end{center}
@@ -709,26 +704,6 @@ if (flow > 0) {
     \item \textbf{Atomic contention thấp}: Chỉ ~5\% cells có lava active
 \end{enumerate}
 \end{keypoint}
-
-%==============================================================================
-\section{block\_size\_exploration.cu - Tool Benchmark}
-%==============================================================================
-
-\begin{originbox}
-\textbf{File độc lập}, không phụ thuộc vào các file khác.\\
-Mục đích: Test các kích thước block để tìm cấu hình tối ưu.
-\end{originbox}
-
-\begin{lstlisting}[caption={Chạy benchmark tool}]
-$ nvcc -O3 -arch=sm_52 block_size_exploration.cu -o block_explore
-$ ./block_explore
-
-| Block | Thrds | Grid Size | Neighbor | Elemwise | Occupancy |
-|-------|-------|-----------|----------|----------|-----------|
-| 8x8   |  64   | (65, 48)  |   0.125  |   0.042  |   50.0%   |
-|16x16  | 256   | (33, 24)  |   0.098  |   0.038  |  100.0%   | <- TỐT
-|32x32  |1024   | (17, 12)  |   0.112  |   0.041  |   50.0%   |
-\end{lstlisting}
 
 %==============================================================================
 \section{Tổng Kết}
