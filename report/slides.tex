@@ -370,46 +370,50 @@
 % ============================================================================
 
 \begin{frame}{Conclusions \& Key Takeaways}
-    \begin{columns}
-        \begin{column}{0.5\textwidth}
+    \begin{columns}[T]  % Top-align columns
+        \begin{column}{0.48\textwidth}
             \begin{block}{\faCheckCircle\ Main Results}
-                \begin{enumerate}
+                \small
+                \begin{enumerate}\itemsep0.1em
                     \item \textbf{CfAMo is fastest} (19.74s, 1.09$\times$)
                     \item All versions are \textbf{memory-bound}
                     \item \textbf{High occupancy $\neq$ performance}
-                    \item Memory footprint matters more than compute optimization
+                    \item Memory footprint $>$ compute optimization
                 \end{enumerate}
             \end{block}
 
-            \vspace{0.3cm}
+            \vspace{0.4cm}
             \begin{block}{\faLightbulb\ Why CfAMo Wins}
-                \begin{itemize}
+                \small
+                \begin{itemize}\itemsep0.1em
                     \item Eliminates 12MB flow buffer
                     \item Better cache utilization
-                    \item Sparse lava ($<$5\% active) minimizes atomic contention
+                    \item Sparse lava ($<$5\%) $\rightarrow$ low atomic contention
                 \end{itemize}
             \end{block}
         \end{column}
-        \begin{column}{0.5\textwidth}
+        \hfill
+        \begin{column}{0.48\textwidth}
             \begin{block}{\faChartLine\ Performance Summary}
                 \begin{center}
-                \begin{tikzpicture}[scale=0.8]
+                \begin{tikzpicture}[scale=0.7]
                     % Speedup bars
-                    \draw[fill=gray!30] (0,0) rectangle (3.5,0.4) node[midway, font=\tiny] {CfAMe: 0.88$\times$};
-                    \draw[fill=gray!40] (0,0.6) rectangle (3.72,1.0) node[midway, font=\tiny] {T+Halo: 0.93$\times$};
-                    \draw[fill=gray!50] (0,1.2) rectangle (4.0,1.6) node[midway, font=\tiny] {Global: 1.00$\times$};
-                    \draw[fill=cyan!50] (0,1.8) rectangle (4.28,2.2) node[midway, font=\tiny] {Tiled: 1.07$\times$};
-                    \draw[fill=unicalred!70] (0,2.4) rectangle (4.36,2.8) node[midway, font=\tiny, white] {\textbf{CfAMo: 1.09$\times$}};
+                    \draw[fill=gray!30] (0,0) rectangle (3.5,0.35) node[midway, font=\tiny] {CfAMe: 0.88$\times$};
+                    \draw[fill=gray!40] (0,0.5) rectangle (3.72,0.85) node[midway, font=\tiny] {T+Halo: 0.93$\times$};
+                    \draw[fill=gray!50] (0,1.0) rectangle (4.0,1.35) node[midway, font=\tiny] {Global: 1.00$\times$};
+                    \draw[fill=cyan!50] (0,1.5) rectangle (4.28,1.85) node[midway, font=\tiny] {Tiled: 1.07$\times$};
+                    \draw[fill=unicalred!70] (0,2.0) rectangle (4.36,2.35) node[midway, font=\tiny, white] {\textbf{CfAMo: 1.09$\times$}};
                     % Baseline
-                    \draw[dashed, thick] (4.0,0) -- (4.0,3);
-                    \node[font=\tiny, rotate=90] at (4.15,1.5) {baseline};
+                    \draw[dashed, thick] (4.0,-0.1) -- (4.0,2.5);
+                    \node[font=\tiny, rotate=90] at (4.2,1.2) {baseline};
                 \end{tikzpicture}
                 \end{center}
             \end{block}
 
-            \vspace{0.2cm}
+            \vspace{0.4cm}
             \begin{alertblock}{\faExclamationTriangle\ Lesson Learned}
-                For small grids that fit in L2 cache, \textbf{reducing memory footprint} is more effective than shared memory tiling.
+                \small
+                For small grids fitting in L2 cache, \textbf{reducing memory footprint} beats shared memory tiling.
             \end{alertblock}
         \end{column}
     \end{columns}
