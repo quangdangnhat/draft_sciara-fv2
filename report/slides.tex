@@ -14,10 +14,16 @@
 \setbeamercolor{palette secondary}{bg=unicalredlight,fg=white}
 \setbeamercolor{palette tertiary}{bg=unicalred,fg=white}
 \setbeamercolor{structure}{fg=unicalred}
-\setbeamercolor{title}{fg=unicalred}
+\setbeamercolor{title}{fg=white,bg=unicalred}  % white text on red background
 \setbeamercolor{frametitle}{fg=unicalred}
 \setbeamercolor{block title}{bg=unicalred,fg=white}
 \setbeamercolor{block body}{bg=unicalred!10}
+
+% === REMOVE SHADOWS ===
+\setbeamertemplate{blocks}[default]  % remove block shadows
+\setbeamertemplate{title page}[default]  % remove title page shadows
+\setbeamertemplate{items}[default]  % remove item shadows
+\setbeamertemplate{sections/subsections in toc}[default]  % remove TOC shadows
 
 % === PACKAGES ===
 \usepackage{graphicx}
