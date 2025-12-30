@@ -27,8 +27,10 @@
 % === NUMBERED SECTIONS IN TOC ===
 \setbeamertemplate{section in toc}[sections numbered]  % add numbers to TOC
 
-% === LOGO IN TOP-RIGHT CORNER ===
-\logo{\includegraphics[height=0.8cm]{fig1.eps}\hspace{0.3cm}}
+% === LOGO IN TOP-RIGHT CORNER (75% opacity) ===
+\logo{\begin{tikzpicture}[opacity=0.75]
+    \node{\includegraphics[height=0.8cm]{fig1.eps}};
+\end{tikzpicture}\hspace{0.3cm}}
 
 % === PACKAGES ===
 \usepackage{graphicx}
